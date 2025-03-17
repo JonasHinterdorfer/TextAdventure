@@ -1,4 +1,4 @@
-# Use an official Nginx image as the base image
+ # Use an official Nginx image as the base image
 FROM nginx:alpine
 
 # Set the working directory inside the container
