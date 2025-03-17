@@ -1,0 +1,32 @@
+name: Push to Gitea
+
+on:
+  push:
+    branches:
+      - main  # or your desired branch
+
+jobs:
+  push_to_gitea:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Git for Gitea
+        run: |
+          git config --global user.name "GitHub"
+          git config --global user.email "repo@github.com"
+          git remote add gitea "ssh://git@git.ionas999.at:9002/jonas/text-adventure.git"  # Updated Gitea repo URL
+
+      - name: Set up SSH key for Gitea
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.GITA_SECRET }}" > ~/.ssh/id_rsa  # Use the 'GITA_SECRET' secret for the private key
+          chmod 600 ~/.ssh/id_rsa  # Ensure proper permissions for the SSH key
+          ssh-keyscan git.ionas999.at >> ~/.ssh/known_hosts  # Add Gitea server to known hosts
+
+      - name: Push to Gitea
+        run: |
+          git push --force gitea main  # Replace 'main' with the desired branch
+
