@@ -1,0 +1,173 @@
+name: Build, Publish Docker Image, and Deploy to Kubernetes
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build_and_push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check if Dockerfile exists
+        id: check_dockerfile
+        run: |
+          if [ -f "Dockerfile" ]; then
+            echo "exists=true" >> $GITHUB_ENV
+          else
+            echo "exists=false" >> $GITHUB_ENV
+          fi                    
+
+      - name: Set repository name as image name
+        if: env.exists == 'true'
+        run: echo "IMAGE_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Log in to Docker registry
+        if: env.exists == 'true'
+        run: |
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | docker login git.ionas999.at -u ${{ secrets.REGISTRY_USERNAME }} --password-stdin                    
+
+      - name: Build Docker image
+        if: env.exists == 'true'
+        run: |
+          docker build -t git.ionas999.at/${{ env.IMAGE_NAME }}:latest .                    
+
+      - name: Push Docker image
+        if: env.exists == 'true'
+        run: |
+          docker push git.ionas999.at/${{ env.IMAGE_NAME }}:latest                    
+
+  deploy_to_k8s:
+    runs-on: ubuntu-latest
+    needs: build_and_push
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        env:
+          KUBE_CONFIG: ${{ secrets.K3S_CONFIG }}
+        shell: bash
+        run: |
+          # Fetch the latest stable version of kubectl
+          KUBECTL_VERSION=$(curl -s https://dl.k8s.io/release/stable.txt)
+          if [ -z "$KUBECTL_VERSION" ]; then
+            echo "Failed to fetch the latest kubectl version. Exiting."
+            exit 1
+          fi
+
+          # Download kubectl binary
+          curl -LO "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl"
+          if [ $? -ne 0 ]; then
+            echo "Failed to download kubectl binary. Exiting."
+            exit 1
+          fi
+
+          # Make kubectl executable and move to PATH
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+
+          # Verify kubectl installation
+          kubectl version --client
+
+          # Install kubelogin
+          curl -fsSLO https://github.com/int128/kubelogin/releases/download/v1.25.4/kubelogin_linux_amd64.zip
+          unzip kubelogin_linux_amd64.zip kubelogin -d kubelogin
+          mv kubelogin/kubelogin kubelogin/kubectl-oidc_login
+          export PATH=$PATH:$(realpath kubelogin)
+          
+          # Configure kubeconfig
+          mkdir -p ~/.kube
+          echo "$KUBE_CONFIG" > ~/.kube/config                        
+
+      - name: Generate and Apply K8s Manifests
+        run: |
+          # Get repository name and convert to lowercase
+          REPO_NAME=$(echo "${GITHUB_REPOSITORY##*/}" | tr '[:upper:]' '[:lower:]')
+          FULL_REPO=$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
+          
+          # Set namespace consistently
+          NAMESPACE="gitea-deployment"
+          
+          echo "Using repository name: $REPO_NAME"
+          echo "Using full repository path: $FULL_REPO"
+          echo "Using namespace: $NAMESPACE"
+          
+          # Create namespace if it doesn't exist
+          kubectl get namespace $NAMESPACE || kubectl create namespace $NAMESPACE
+          
+          cat <<EOF > k8s-manifests.yaml
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: ${REPO_NAME}
+            namespace: ${NAMESPACE}
+            labels:
+              app: ${REPO_NAME}
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: ${REPO_NAME}
+            template:
+              metadata:
+                labels:
+                  app: ${REPO_NAME}
+              spec:
+                containers:
+                - name: ${REPO_NAME}
+                  image: git.ionas999.at/${FULL_REPO}:latest
+                  ports:
+                  - containerPort: 80
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: ${REPO_NAME}
+            namespace: ${NAMESPACE}
+          spec:
+            type: ClusterIP
+            ports:
+            - port: 80
+              targetPort: 80
+            selector:
+              app: ${REPO_NAME}
+          ---
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: ${REPO_NAME}-ingress
+            namespace: ${NAMESPACE}
+            annotations:
+              traefik.ingress.kubernetes.io/router.entrypoints: websecure
+              traefik.ingress.kubernetes.io/router.tls: "true"
+              traefik.ingress.kubernetes.io/router.tls.certresolver: le
+          spec:
+            ingressClassName: traefik
+            tls:
+            - hosts:
+              - ${REPO_NAME}.git.ionas999.at
+            rules:
+            - host: ${REPO_NAME}.git.ionas999.at
+              http:
+                paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: ${REPO_NAME}
+                      port:
+                        number: 80
+          EOF
+          
+          # Display the manifest for debugging
+          echo "--- Generated manifest: ---"
+          cat k8s-manifests.yaml
+          echo "-------------------------"
+          
+          # Apply the manifests
+          kubectl apply -f k8s-manifests.yaml          
