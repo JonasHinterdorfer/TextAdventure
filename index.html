@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prolog Adventure Console</title>
+    <!-- Add Tau Prolog library directly in the head section -->
+    <script src="https://cdn.jsdelivr.net/npm/tau-prolog"></script>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1e1e1e;
+            color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        header {
+            background-color: #333;
+            color: #00ff00;
+            padding: 10px 20px;
+            text-align: center;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #console {
+            background-color: #000;
+            color: #00ff00;
+            border: 1px solid #444;
+            border-radius: 5px;
+            padding: 10px;
+            overflow-y: auto;
+            flex-grow: 1;
+            margin-bottom: 10px;
+            white-space: pre-wrap;
+            height: 400px;
+            font-size: 16px;
+        }
+        
+        .input-area {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        
+        #prompt {
+            color: #00ff00;
+            margin-right: 5px;
+            font-size: 16px;
+        }
+        
+        #command-input {
+            flex-grow: 1;
+            background-color: #000;
+            color: #00ff00;
+            border: none;
+            outline: none;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            background-color: #444;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            border-radius: 3px;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        
+        button:hover {
+            background-color: #555;
+        }
+        
+        .status {
+            color: #aaa;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Prolog Adventure Console</h1>
+    </header>
+    
+    <div class="container">
+        <div class="status" id="status">Loading adventure.pl from server...</div>
+        
+        <div class="controls">
+            <button id="start-button" disabled>Start Adventure</button>
+            <button id="clear-button">Clear Console</button>
+            <button id="reload-button">Reload Program</button>
+        </div>
+        
+        <div id="console">Welcome to the Prolog Adventure Console!
+System initializing...
+        </div>
+        
+        <div class="input-area">
+            <span id="prompt">?- </span>
+            <input type="text" id="command-input" placeholder="Enter Prolog command" disabled>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const consoleOutput = document.getElementById('console');
+        const commandInput = document.getElementById('command-input');
+        const statusElement = document.getElementById('status');
+        const startButton = document.getElementById('start-button');
+        const clearButton = document.getElementById('clear-button');
+        const reloadButton = document.getElementById('reload-button');
+        
+        // Tau Prolog session
+        let session = null;
+        let programLoaded = false;
+        let programContent = "";
+        
+        // Check if Tau Prolog is loaded
+        function checkTauProlog() {
+            if (typeof pl === 'undefined') {
+                addToConsole("Error: Tau Prolog library not loaded!");
+                addToConsole("Trying to load Tau Prolog dynamically...");
+                
+                // Try to load Tau Prolog dynamically
+                const script = document.createElement('script');
+                script.src = "https://cdnjs.cloudflare.com/ajax/libs/tau-prolog/0.3.4/tau-prolog.min.js";
+                script.onload = function() {
+                    addToConsole("Tau Prolog loaded successfully!");
+                    init();
+                };
+                script.onerror = function() {
+                    addToConsole("Failed to load Tau Prolog library. Please check your internet connection.");
+                    statusElement.textContent = "Error: Could not load Tau Prolog library";
+                };
+                document.body.appendChild(script);
+                return false;
+            }
+            return true;
+        }
+        
+        // Initialize
+        function init() {
+            if (!checkTauProlog()) {
+                return; // Wait for dynamic loading
+            }
+            
+            try {
+                session = pl.create();
+                addToConsole("Prolog engine initialized successfully.");
+                
+                // Slightly delay the file loading to ensure the Prolog engine is initialized
+                setTimeout(loadPrologFile, 500);
+            } catch (error) {
+                addToConsole("Error initializing Prolog engine: " + error.message);
+                console.error("Error initializing Prolog engine:", error);
+            }
+        }
+        
+        // Add text to console
+        function addToConsole(text) {
+            consoleOutput.textContent += "\n" + text;
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+        
+        // Clear console
+        function clearConsole() {
+            consoleOutput.textContent = "Console cleared.";
+        }
+        
+        // Load Prolog file from server
+        function loadPrologFile() {
+            statusElement.textContent = "Loading adventure.pl from server...";
+            
+            fetch('./adventure.pl', {
+                method: 'GET',
+                cache: 'no-cache'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.text();
+            })
+            .then(content => {
+                // Check if content is empty
+                if (!content || content.trim() === "") {
+                    throw new Error("File is empty");
+                }
+                
+                programContent = content;
+                statusElement.textContent = "adventure.pl loaded successfully. Click 'Start Adventure' to begin.";
+                addToConsole(`adventure.pl loaded from server (${content.length} bytes).`);
+                addToConsole("Content preview: " + content.substring(0, 50) + "...");
+                addToConsole("Click 'Start Adventure' to begin.");
+                startButton.disabled = false;
+            })
+            .catch(error => {
+                statusElement.textContent = "Error loading adventure.pl: " + error.message;
+                addToConsole("Error loading adventure.pl from server: " + error.message);
+                addToConsole("Checking browser console for more details...");
+                console.error("Error loading Prolog file:", error);
+                addToConsole("Make sure adventure.pl exists in the same directory as this HTML file.");
+                addToConsole("Try refreshing the page or checking file permissions.");
+                
+                // Diagnostic information
+                addToConsole("\nDiagnostic information:");
+                addToConsole("- URL being fetched: ./adventure.pl");
+                addToConsole("- Current page URL: " + window.location.href);
+                
+                // Try an alternative approach
+                addToConsole("\nTrying alternative loading method...");
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', './adventure.pl', true);
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        programContent = xhr.responseText;
+                        statusElement.textContent = "adventure.pl loaded successfully via alternative method.";
+                        addToConsole("Success! adventure.pl loaded via alternative method.");
+                        addToConsole("Content preview: " + programContent.substring(0, 50) + "...");
+                        addToConsole("Click 'Start Adventure' to begin.");
+                        startButton.disabled = false;
+                    } else {
+                        addToConsole("Alternative method failed. Status: " + xhr.status);
+                    }
+                };
+                xhr.onerror = function() {
+                    addToConsole("Alternative method failed with network error.");
+                };
+                xhr.send();
+            });
+        }
+        
+        // Load Prolog program into Tau Prolog
+        function loadProgram() {
+            if (!programContent) {
+                addToConsole("Error: No program content to load.");
+                return;
+            }
+            
+            if (!checkTauProlog()) {
+                addToConsole("Cannot load program: Tau Prolog library not available.");
+                return;
+            }
+            
+            addToConsole("Loading program into Prolog engine...");
+            
+            try {
+                session.consult(programContent, {
+                    success: function() {
+                        programLoaded = true;
+                        statusElement.textContent = "Program loaded and ready. Type your Prolog queries below.";
+                        addToConsole("Program loaded successfully!");
+                        addToConsole("Type your Prolog queries in the command line below.");
+                        commandInput.disabled = false;
+                        commandInput.focus();
+                    },
+                    error: function(err) {
+                        statusElement.textContent = "Error loading program: " + err;
+                        addToConsole("Error loading program: " + err);
+                        addToConsole("This might be due to syntax errors in your Prolog file.");
+                        
+                        // Try to provide more helpful error information
+                        const errorLines = err.toString().split('\n');
+                        if (errorLines.length > 1) {
+                            addToConsole("\nError details:");
+                            errorLines.forEach(line => {
+                                addToConsole("- " + line);
+                            });
+                        }
+                    }
+                });
+            } catch (error) {
+                addToConsole("Error in program loading: " + error.message);
+                console.error("Error in program loading:", error);
+            }
+        }
+        
+        // Execute Prolog query
+        function executeQuery(query) {
+            if (!programLoaded) {
+                addToConsole("Error: Please load a program first.");
+                return;
+            }
+            
+            addToConsole("?- " + query);
+            
+            try {
+                session.query(query, {
+                    success: function(goal) {
+                        session.answer({
+                            success: function(answer) {
+                                if (answer === false) {
+                                    addToConsole("false.");
+                                } else if (pl.type.is_substitution(answer)) {
+                                    let vars = Object.keys(answer.links);
+                                    if (vars.length === 0) {
+                                        addToConsole("true.");
+                                    } else {
+                                        let result = "";
+                                        for (let i = 0; i < vars.length; i++) {
+                                            result += vars[i] + " = " + answer.links[vars[i]] + (i < vars.length - 1 ? ",\n" : "");
+                                        }
+                                        addToConsole(result + ".");
+                                    }
+                                    
+                                    // Check for more answers
+                                    moreAnswers();
+                                }
+                            },
+                            error: function(err) {
+                                addToConsole("Error: " + err);
+                            },
+                            fail: function() {
+                                addToConsole("false.");
+                            },
+                            limit: function() {
+                                addToConsole("Limit exceeded.");
+                            }
+                        });
+                    },
+                    error: function(err) {
+                        addToConsole("Error: " + err);
+                    }
+                });
+            } catch (error) {
+                addToConsole("Error executing query: " + error.message);
+                console.error("Error executing query:", error);
+            }
+        }
+        
+        // Check for more answers
+        function moreAnswers() {
+            try {
+                session.answer({
+                    success: function(answer) {
+                        if (answer === false) {
+                            // No more answers
+                        } else if (pl.type.is_substitution(answer)) {
+                            let vars = Object.keys(answer.links);
+                            if (vars.length === 0) {
+                                addToConsole("true ;");
+                            } else {
+                                let result = "";
+                                for (let i = 0; i < vars.length; i++) {
+                                    result += vars[i] + " = " + answer.links[vars[i]] + (i < vars.length - 1 ? ",\n" : "");
+                                }
+                                addToConsole(result + " ;");
+                            }
+                            
+                            // Check for more answers
+                            moreAnswers();
+                        }
+                    },
+                    error: function(err) {
+                        addToConsole("Error: " + err);
+                    },
+                    fail: function() {
+                        // No more answers
+                    },
+                    limit: function() {
+                        addToConsole("Limit exceeded.");
+                    }
+                });
+            } catch (error) {
+                addToConsole("Error checking for more answers: " + error.message);
+            }
+        }
+        
+        // Event listeners
+        startButton.addEventListener('click', function() {
+            if (!programContent) {
+                addToConsole("Error: adventure.pl could not be loaded.");
+                return;
+            }
+            loadProgram();
+        });
+        
+        clearButton.addEventListener('click', clearConsole);
+        
+        reloadButton.addEventListener('click', function() {
+            programLoaded = false;
+            commandInput.disabled = true;
+            startButton.disabled = true;
+            
+            try {
+                if (typeof pl !== 'undefined') {
+                    session = pl.create();
+                    addToConsole("Prolog session reinitialized.");
+                } else {
+                    addToConsole("Error: Tau Prolog library not available.");
+                    checkTauProlog();
+                    return;
+                }
+            } catch (error) {
+                addToConsole("Error reinitializing Prolog engine: " + error.message);
+                console.error("Error reinitializing Prolog engine:", error);
+                return;
+            }
+            
+            addToConsole("Reloading program...");
+            loadPrologFile();
+        });
+        
+        commandInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                const query = commandInput.value.trim();
+                if (query) {
+                    executeQuery(query);
+                    commandInput.value = '';
+                }
+            }
+        });
+        
+        // Initialize on page load with a check to make sure the script is fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Wait a moment to ensure scripts are loaded
+            setTimeout(init, 300);
+        });
+    </script>
+</body>
+</html>
