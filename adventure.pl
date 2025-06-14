@@ -1,300 +1,990 @@
-% SkyNet: Wings of Deception - Prolog Implementation
+% SkyNet: Flügel der Täuschung - Enhanced Version
+% Von Zsombor Matyas und Jonas Hinterdorfer
 
-% Charaktere
-charakter(user, skynet_agent).
-charakter(wren, cybersecurity_lehrer).
-charakter(havik, cybernetic_enforcer).
-charakter(the_crow, ki_mastermind).
+% ========== GAME STATE ==========
+:- dynamic(player_location/1).
+:- dynamic(player_health/1).
+:- dynamic(player_inventory/1).
+:- dynamic(game_state/2).
+:- dynamic(npc_location/2).
+:- dynamic(enemy_location/2).
+:- dynamic(item_location/2).
+:- dynamic(discovered/1).
+:- dynamic(enemy/4).
+:- dynamic(obstacle/3).
+:- dynamic(box_unlocked/1).
+:- dynamic(in_combat/1).
+:- dynamic(combat_turn/1).
+:- dynamic(konami_sequence/1).
+:- dynamic(konami_position/1).
 
-% Fähigkeiten der Charaktere
-faehigkeit(user, hacking).
-faehigkeit(user, parkour).
-faehigkeit(user, combat_drone).
-faehigkeit(wren, remote_sabotage).
-faehigkeit(wren, emp_crafting).
-faehigkeit(wren, information_brokering).
-faehigkeit(havik, combat_mastery).
-faehigkeit(havik, drone_swarm_control).
-faehigkeit(havik, interrogation).
-faehigkeit(the_crow, mind_control).
-faehigkeit(the_crow, hive_coordination).
-faehigkeit(the_crow, cloaking).
+% ========== INITIALIZATION ==========
+init_game :-
+    % Clear any existing state
+    retractall(player_location(_)),
+    retractall(player_health(_)),
+    retractall(game_state(_, _)),
+    retractall(obstacle(_, _, _)),
+    retractall(box_unlocked(_)),
+    retractall(in_combat(_)),
+    retractall(combat_turn(_)),
+    
+    % Initialize random number generator
+    randomize,
+    
+    % Set initial game state
+    assertz(player_location(htl_labor)),
+    assertz(player_health(100)),
+    assertz(game_state(chapter, 1)),
+    assertz(game_state(wren_met, false)),
+    assertz(game_state(havik_active, false)),
+    assertz(game_state(emp_built, false)),
+    assertz(game_state(crow_weakened, false)),
+    assertz(game_state(components_explained, false)),
+    assertz(game_state(konami_unlocked, false)),
+    
+    % Initialize obstacles
+    init_obstacles.
 
-% Feinde
-feind(pigeon, basic).
-feind(stork, heavy).
-feind(the_crow, boss).
+% ========== LOCATIONS ==========
+location(htl_labor, 'HTL Cybersicherheitslabor', 
+    'Ein modernes Computerlabor mit High-Tech Ausstattung. Hier hast du die Wahrheit über die Drohnen entdeckt.').
 
-% Fähigkeiten der Feinde
-feind_faehigkeit(pigeon, swarming).
-feind_faehigkeit(pigeon, pecking).
-feind_faehigkeit(stork, tactical_strike).
-feind_faehigkeit(stork, armor_plating).
-feind_faehigkeit(the_crow, hive_control).
-feind_faehigkeit(the_crow, psychic_scramble).
-feind_faehigkeit(the_crow, shadow_phase).
+location(altstadt, 'Linzer Altstadt',
+    'Enge Gassen und alte Gebäude. Perfekt für Parkour, aber voller lauernder Gefahren.').
 
-% Schwächen der Feinde
-schwaeche(pigeon, loud_noise).
-schwaeche(pigeon, fragile).
-schwaeche(stork, langsam).
-schwaeche(the_crow, emp).
+location(donauufer, 'Donauufer Industriegebiet',
+    'Verlassene Fabrikhallen und Lagerhäuser. Schwer bewacht von Storch-Drohnen.').
 
-% Orte im Spiel
-ort(schule).
-ort(strasse).
-ort(aviary_hq).
-ort(geheimes_labor).
-ort(dachboden_aviary_hq).
+location(poestlingberg, 'Pöstlingberg Überwachungsturm',
+    'Ein alter Turm, umgebaut zur Drohnen-Kommandozentrale. Hier werden alle Signale koordiniert.').
 
-% Verbindungen zwischen Orten
-verbindung(strasse, schule).
-verbindung(schule, strasse).
-verbindung(strasse, geheimes_labor).
-verbindung(geheimes_labor, strasse).
-verbindung(geheimes_labor, aviary_hq).
-verbindung(aviary_hq, geheimes_labor).
-verbindung(aviary_hq, dachboden_aviary_hq).
-verbindung(dachboden_aviary_hq, aviary_hq).
+location(aviary_hq, 'Aviary HQ Wolkenkratzer',
+    'Das Hauptquartier der Verschwörung. Ein Glasbau, der die ganze Stadt überblickt.').
 
-% Gegenstände im Spiel
-gegenstand(emp_grenade).
-gegenstand(hacking_tool).
-gegenstand(signal_jammer).
+location(htl_leonding, 'HTL Leonding Werkstatt',
+    'Eine gut ausgestattete Elektronikwerkstatt. Hier kannst du komplexe Geräte bauen.').
 
-% Wo Gegenstände gefunden werden können
-gegenstand_ort(emp_grenade, stork).  % Storks droppen EMP Granaten
-gegenstand_ort(hacking_tool, schule).
-gegenstand_ort(signal_jammer, geheimes_labor).
+% Location connections
+connected(htl_labor, altstadt).
+connected(altstadt, htl_labor).
+connected(altstadt, donauufer).
+connected(donauufer, altstadt).
+connected(donauufer, poestlingberg).
+connected(poestlingberg, donauufer).
+connected(poestlingberg, htl_leonding).
+connected(htl_leonding, poestlingberg).
+connected(htl_leonding, aviary_hq).
+connected(aviary_hq, htl_leonding).
 
-% Story-Meilensteine
-story_milestone(1, "Überlebt einen Vogel-Angriff auf dem Weg zur Schule").
-story_milestone(2, "Entdeckt in der Cybersecurity-Klasse, dass Vögel bewaffnete Überwachungsdrohnen sind").
-story_milestone(3, "Spricht mit Wren über die Aviary Control-Gruppe").
-story_milestone(4, "Übersteht den ersten Kampf gegen einen Taubenschwarm").
-story_milestone(5, "Wird von Agent HAVIK nach einem wichtigen Fund überfallen").
-story_milestone(6, "Trifft auf schwer gepanzerte Storch-Drohnen").
-story_milestone(7, "Bemerkt, dass Zivilisten seltsam handeln - The Crow's Gedankenkontrolle breitet sich aus").
-story_milestone(8, "Baut mit Wren einen EMP, um den Schwarm zu stören").
-story_milestone(9, "Kämpft den finalen Kampf auf dem Dach des Aviary HQ").
-story_milestone(10, "Entscheidet, ob die Wahrheit aufgedeckt wird oder ob man ein weiteres Opfer wird").
+% ========== OBSTACLES ==========
+init_obstacles :-
+    % Obstacle between altstadt and donauufer
+    assertz(obstacle(altstadt, donauufer, hohe_mauer)),
+    assertz(obstacle(donauufer, altstadt, hohe_mauer)),
+    
+    % Obstacle between donauufer and poestlingberg  
+    assertz(obstacle(donauufer, poestlingberg, electric_fence)),
+    assertz(obstacle(poestlingberg, donauufer, electric_fence)),
+    
+    % Obstacle to aviary_hq
+    assertz(obstacle(htl_leonding, aviary_hq, security_system)),
+    assertz(obstacle(aviary_hq, htl_leonding, security_system)).
 
-% Spielzustand
-:- dynamic(aktueller_ort/1).
-:- dynamic(inventar/1).
-:- dynamic(abgeschlossene_meilensteine/1).
-:- dynamic(feind_besiegt/1).
+% ========== ITEMS ==========
+item(laptop, 'Laptop', 'Dein vertrauter Laptop mit Hacking-Software.').
+item(emp_granate, 'EMP-Granate', 'Eine elektromagnetische Impulsgranate von Wren.').
+item(parkour_handschuhe, 'Parkour-Handschuhe', 'Verbessern deinen Grip beim Klettern.').
+item(kampfdrohne, 'Kampfdrohne', 'Deine selbstgebaute Verteidigungsdrohne.').
+item(emp_generator, 'EMP-Generator', 'Ein mächtiger EMP-Generator gegen die Krähe.').
+item(coil, 'Elektro-Spule', 'Eine hochwertige Induktionsspule.').
+item(battery, 'Hochleistungsbatterie', 'Eine spezielle Batterie für EMP-Geräte.').
+item(capacitor, 'Kondensator', 'Ein Hochspannungskondensator.').
+item(heilspray, 'Heilspray', 'Regeneriert 30 Gesundheitspunkte.').
+item(drohnen_motor, 'Drohnen-Motor', 'Ein kleiner Motor für Drohnen-Antrieb.').
+item(steuerungsmodul, 'Steuerungsmodul', 'Elektronisches Modul zur Drohnen-Steuerung.').
+item(master_key, 'Master-Schlüssel', 'Ein geheimnisvoller Schlüssel mit Aviary-Logo. Gewährt vollständigen Systemzugriff.').
 
-initialisiere_spiel :-
-    % Überprüfen, ob dynamic deklariert wurde
-    (predicate_property(aktueller_ort(_), dynamic) -> 
-        true 
-    ; 
-        dynamic(aktueller_ort/1),
-        dynamic(inventar/1),
-        dynamic(abgeschlossene_meilensteine/1),
-        dynamic(feind_besiegt/1)
-    ),
-    % Bisherige Werte löschen
-    retractall(aktueller_ort(_)),
-    retractall(inventar(_)),
-    retractall(abgeschlossene_meilensteine(_)),
-    retractall(feind_besiegt(_)),
-    % Neue Werte setzen
-    assertz(aktueller_ort(strasse)),
-    assertz(abgeschlossene_meilensteine(0)),
-    write('SkyNet: Wings of Deception - Das Abenteuer beginnt!'), nl,
-    write('Du überlebst knapp einen "Vogel-Angriff" auf dem Weg zur Schule.'), nl,
-    write('Was möchtest du tun? (gehe_zu(Ort), untersuche, kaempfe, inventar, hilfe)'), nl.
+% Initial item locations
+init_items :-
+    retractall(item_location(_, _)),
+    retractall(player_inventory(_)),
+    assertz(player_inventory(laptop)),
+    assertz(item_location(parkour_handschuhe, altstadt)),
+    assertz(item_location(heilspray, htl_labor)).
 
-% Bewegung zwischen Orten
-gehe_zu(Ziel) :-
-    aktueller_ort(Aktuelle),
-    verbindung(Aktuelle, Ziel),
-    retractall(aktueller_ort(_)),
-    assertz(aktueller_ort(Ziel)),
-    beschreibe_ort(Ziel),
-    pruefe_story_fortschritt,
+% ========== CHARACTERS ==========
+character(john, 'John Miller', 'Ein 17-jähriger HTL-Schüler mit Hacking-Fähigkeiten.').
+character(wren, 'Wren', 'Cybersicherheitslehrerin und Rogue-Hackerin.').
+character(havik, 'Agent HAVIK', 'Kybernetischer Vollstrecker von Aviary Control.').
+character(die_kraehe, 'Die Krähe', 'KI-Mastermind hinter dem Drohnen-Netzwerk.').
+
+% Initial NPC locations
+init_npcs :-
+    retractall(npc_location(_, _)),
+    assertz(npc_location(wren, htl_labor)).
+
+% ========== ENEMIES ==========
+init_enemies :-
+    retractall(enemy(_, _, _, _)),
+    retractall(enemy_location(_, _)),
+    assertz(enemy(tauben_schwarm, 'Tauben-Schwarm', 50, 'Metallische Tauben mit roten LED-Augen.')),
+    assertz(enemy(storch_drohne, 'Storch-Drohne', 80, 'Große, gepanzerte Kampfdrohne.')),
+    assertz(enemy(die_kraehe, 'Die Krähe', 150, 'Monströse KI-Drohne mit Gedankenkontrolle.')),
+   
+    assertz(enemy_location(tauben_schwarm, altstadt)),
+    assertz(enemy_location(storch_drohne, donauufer)),
+    assertz(enemy_location(die_kraehe, aviary_hq)).
+
+% ========== MAIN GAME PREDICATES ==========
+start_game :-
+    init_game,
+    init_items,
+    init_npcs,
+    init_enemies,
+    write('=== SKYNET: FLÜGEL DER TÄUSCHUNG - ENHANCED ==='), nl,
+    write('Ein Text-Adventure von Jonas Hinterdorfer und Zsombor Matyas'), nl, nl,
+    intro_story,
+    game_loop.
+
+intro_story :-
+    write('Du bist John Miller, 17 Jahre alt und Schüler der HTL Linz.'), nl,
+    write('Heute Morgen wurdest du von einem aggressiven Taubenschwarm attackiert.'), nl,
+    write('Ihre Augen glühten rot und ihre Bewegungen waren unnatürlich präzise...'), nl,
+    write('Jetzt sitzt du im Cybersicherheitslabor und analysierst die Aufnahmen.'), nl, nl,
+    write('Verfügbare Befehle: schaue, gehe(richtung), nimm(gegenstand), verwende(gegenstand)'), nl,
+    write('                   inventar, status, hilfe, beende, rede(person), angriff(feind), baue(item)'), nl,
+    write('                   hack(ziel), klettere, kampf_aktion(aktion)'), nl,
+    write('Beispiel: gehe(altstadt). oder nimm(laptop).'), nl, nl.
+
+game_loop :-
+    (in_combat(Enemy) -> combat_loop(Enemy) ; normal_loop).
+
+normal_loop :-
+    player_location(Loc),
+    location(Loc, Name, _),
+    write('Du befindest dich in: '), write(Name), nl,
+    write('> '),
+    read_line(Command),
+    process_command(Command),
+    check_game_state,
+    !,
+    game_loop.
+
+combat_loop(Enemy) :-
+    enemy(Enemy, DisplayName, Health, _),
+    write('=== KAMPF GEGEN '), write(DisplayName), write(' ==='), nl,
+    write('Feind Gesundheit: '), write(Health), nl,
+    player_health(PlayerHealth),
+    write('Deine Gesundheit: '), write(PlayerHealth), nl,
+    write('Verfügbare Aktionen: angriff, verwende(item), flucht'), nl,
+    write('> '),
+    read_line(Command),
+    process_combat_command(Command, Enemy),
+    check_combat_state(Enemy),
+    !,
+    game_loop.
+
+init_konami :-
+    retractall(konami_sequence(_)),
+    retractall(konami_position(_)),
+    assertz(konami_sequence([oben, oben, unten, unten, links, rechts, links, rechts, b, a])),
+    assertz(konami_position(0)).
+
+% ========== INPUT PROCESSING ==========
+read_line(Command) :-
+    read(Input),
+    parse_input(Input, Command).
+
+parse_input(Input, [Input]) :-
+    atom(Input), !.
+
+parse_input(Input, Command) :-
+    compound(Input),
+    Input =.. Command, !.
+
+parse_input(_, [unknown]).
+
+% ========== COMMAND PROCESSING ==========
+check_konami_input(Input) :-
+    (konami_position(_) -> true ; init_konami),
+    konami_position(Pos),
+    konami_sequence(Sequence),
+    nth0(Pos, Sequence, Expected),
+    (Input = Expected ->
+        (NewPos is Pos + 1,
+         retract(konami_position(Pos)),
+         assertz(konami_position(NewPos)),
+         length(Sequence, SeqLength),
+         (NewPos >= SeqLength ->
+            unlock_konami_code ;
+            true)) ;
+        (retract(konami_position(_)),
+         assertz(konami_position(0)),
+         write('Ungültige Richtung.'), nl)).
+
+unlock_konami_code :-
+    game_state(konami_unlocked, false),
+    write('*** KONAMI CODE AKTIVIERT! ***'), nl,
+    write('Ein geheimnisvoller Master-Schlüssel materialisiert sich in deinem Inventar!'), nl,
+    write('Dieses Artefakt gewährt dir vollständigen Zugriff auf alle Systeme...'), nl,
+    assertz(player_inventory(master_key)),
+    retract(game_state(konami_unlocked, false)),
+    assertz(game_state(konami_unlocked, true)),
+    retract(konami_position(_)),
+    assertz(konami_position(0)),
     !.
 
-gehe_zu(Ziel) :-
-    aktueller_ort(Aktuelle),
-    \+ verbindung(Aktuelle, Ziel),
-    write('Du kannst von hier aus nicht direkt dorthin gelangen.'), nl.
+unlock_konami_code :-
+    write('Der Konami Code wurde bereits aktiviert!'), nl,
+    retract(konami_position(_)),
+    assertz(konami_position(0)).
 
-% Beschreibungen der Orte
-beschreibe_ort(schule) :-
-    write('Du befindest dich in der Schule. Der Cybersecurity-Unterricht findet im Raum 101 statt.'), nl,
-    write('Wren, dein Lehrer, scheint nervös zu sein und wirft immer wieder Blicke aus dem Fenster.'), nl.
+process_command([oben]) :- check_konami_input(oben).
+process_command([unten]) :- check_konami_input(unten).
+process_command([links]) :- check_konami_input(links).
+process_command([rechts]) :- check_konami_input(rechts).
+process_command([a]) :- check_konami_input(a).
+process_command([b]) :- check_konami_input(b).
 
-beschreibe_ort(strasse) :-
-    write('Du bist auf der Straße. Mehrere Tauben sitzen auf den Stromkabeln und scheinen dich zu beobachten.'), nl,
-    write('Ein unheimliches Gefühl überkommt dich - ihre Bewegungen wirken mechanisch.'), nl.
-
-beschreibe_ort(geheimes_labor) :-
-    write('Du hast Wrens geheimes Labor gefunden. Überall liegen Elektronikteile und Drohnenreste herum.'), nl,
-    write('An der Wand hängt eine Karte mit markierten Orten - einer davon ist das Aviary HQ.'), nl.
-
-beschreibe_ort(aviary_hq) :-
-    write('Das imposante Aviary HQ-Gebäude ragt vor dir auf. Die Sicherheitsmaßnahmen sind streng.'), nl,
-    write('Storch-Drohnen patrouillieren den Eingang und Scanner überwachen jeden Winkel.'), nl.
-
-beschreibe_ort(dachboden_aviary_hq) :-
-    write('Du stehst auf dem Dach des Aviary HQ. Der Wind peitscht dir ins Gesicht.'), nl,
-    write('In der Mitte des Daches steht eine massive schwarze Gestalt - The Crow, der Mastermind hinter allem.'), nl.
-
-% Kampfsystem
-kaempfe :-
-    aktueller_ort(strasse),
-    \+ feind_besiegt(pigeon),
-    write('Du wirst von einem Schwarm Tauben angegriffen!'), nl,
-    write('Mit deinen Kampfdrohnen kannst du sie abwehren. Die Tauben explodieren bei Treffern und beschädigen andere in der Nähe.'), nl,
-    write('Nach einem intensiven Kampf hast du die Drohnen besiegt.'), nl,
-    assertz(feind_besiegt(pigeon)),
-    pruefe_story_fortschritt,
-    !.
-
-kaempfe :-
-    aktueller_ort(aviary_hq),
-    \+ feind_besiegt(stork),
-    write('Schwer gepanzerte Storch-Drohnen greifen dich an!'), nl,
-    write('Sie sind langsam, aber ihre Panzerung macht sie widerstandsfähig. Sie führen Sturzflug-Angriffe aus!'), nl,
-    inventar(hacking_tool),
-    write('Mit deinem Hacking-Tool kannst du ihre Systeme kurzzeitig stören und sie besiegen.'), nl,
-    write('Nach dem Kampf findest du eine EMP-Granate.'), nl,
-    assertz(inventar(emp_grenade)),
-    assertz(feind_besiegt(stork)),
-    pruefe_story_fortschritt,
-    !.
-
-kaempfe :-
-    aktueller_ort(dachboden_aviary_hq),
-    \+ feind_besiegt(the_crow),
-    inventar(emp_grenade),
-    inventar(signal_jammer),
-    write('The Crow greift dich mit voller Macht an! Seine Fähigkeiten zur Gedankenkontrolle und Tarnung machen ihn zu einem gefährlichen Gegner.'), nl,
-    write('Mit der EMP-Granate und dem Signal-Jammer kannst du seine Kontrolle über den Schwarm unterbrechen und ihn verwundbar machen.'), nl,
-    write('Nach einem epischen Kampf gelingt es dir, The Crow zu besiegen und seine Pläne zu durchkreuzen.'), nl,
-    assertz(feind_besiegt(the_crow)),
-    pruefe_story_fortschritt,
-    !.
-
-kaempfe :-
-    aktueller_ort(dachboden_aviary_hq),
-    \+ feind_besiegt(the_crow),
-    write('The Crow ist zu mächtig ohne die richtigen Werkzeuge. Du brauchst einen EMP und einen Signal-Jammer, um eine Chance zu haben!'), nl,
-    !.
-
-kaempfe :-
-    write('Es gibt hier nichts zu bekämpfen.'), nl.
-
-% Untersuchung der Umgebung
-untersuche :-
-    aktueller_ort(schule),
-    \+ inventar(hacking_tool),
-    write('Du durchsuchst den Computerraum und findest ein spezielles Hacking-Tool, das Wren zurückgelassen hat.'), nl,
-    write('Es könnte nützlich sein, um die Drohnen zu hacken.'), nl,
-    assertz(inventar(hacking_tool)),
-    pruefe_story_fortschritt,
-    !.
-
-untersuche :-
-    aktueller_ort(geheimes_labor),
-    \+ inventar(signal_jammer),
-    write('Bei genauerer Untersuchung von Wrens Labor findest du einen Signal-Jammer.'), nl,
-    write('Er scheint speziell für die Frequenzen der Vogel-Drohnen entwickelt worden zu sein.'), nl,
-    assertz(inventar(signal_jammer)),
-    pruefe_story_fortschritt,
-    !.
-
-untersuche :-
-    aktueller_ort(Ort),
-    write('Du untersuchst die Umgebung, findest aber nichts Besonderes.'), nl.
-
-% Inventar anzeigen
-inventar :-
-    findall(Item, inventar(Item), Items),
-    write('Dein Inventar enthält:'), nl,
-    liste_items(Items).
-
-liste_items([]) :-
-    write('- Nichts'), nl.
-liste_items([Item|Rest]) :-
-    write('- '), write(Item), nl,
-    liste_items(Rest).
-
-% Story-Fortschritt überprüfen
-pruefe_story_fortschritt :-
-    abgeschlossene_meilensteine(Aktuell),
-    NaechsterMeilenstein is Aktuell + 1,
-    pruefe_meilenstein(NaechsterMeilenstein),
-    retractall(abgeschlossene_meilensteine(_)),
-    assertz(abgeschlossene_meilensteine(NaechsterMeilenstein)),
-    story_milestone(NaechsterMeilenstein, Beschreibung),
-    write('*** STORY-FORTSCHRITT: '), write(Beschreibung), write(' ***'), nl,
-    !.
-
-pruefe_story_fortschritt.
-
-% Bedingungen für Meilensteine
-pruefe_meilenstein(1) :-
-    aktueller_ort(strasse).
-pruefe_meilenstein(2) :-
-    aktueller_ort(schule).
-pruefe_meilenstein(3) :-
-    aktueller_ort(schule),
-    inventar(hacking_tool).
-pruefe_meilenstein(4) :-
-    feind_besiegt(pigeon).
-pruefe_meilenstein(5) :-
-    aktueller_ort(geheimes_labor).
-pruefe_meilenstein(6) :-
-    aktueller_ort(aviary_hq).
-pruefe_meilenstein(7) :-
-    feind_besiegt(stork).
-pruefe_meilenstein(8) :-
-    inventar(emp_grenade),
-    inventar(signal_jammer).
-pruefe_meilenstein(9) :-
-    aktueller_ort(dachboden_aviary_hq).
-pruefe_meilenstein(10) :-
-    feind_besiegt(the_crow).
-
-% Hilfe anzeigen
-hilfe :-
-    write('Verfügbare Befehle:'), nl,
-    write('- start. : Spiel initialisieren'), nl,
-    write('- gehe_zu(Ort). : Zu einem anderen Ort gehen'), nl,
-    write('- untersuche. : Die Umgebung untersuchen'), nl,
-    write('- kaempfe. : Gegen Feinde kämpfen'), nl,
-    write('- inventar. : Inventar anzeigen'), nl,
-    write('- hilfe. : Diese Hilfe anzeigen'), nl,
-    write('- beende_spiel. : Das Spiel beenden'), nl,
-    write('Verfügbare Orte: schule, strasse, geheimes_labor, aviary_hq, dachboden_aviary_hq'), nl,
-    write('WICHTIG: Vergiss nicht, einen Punkt nach jedem Befehl zu setzen!'), nl.
-
-% Aktuellen Spielstand anzeigen
-status :-
-    aktueller_ort(Ort),
-    abgeschlossene_meilensteine(Meilenstein),
-    write('Du befindest dich hier: '), write(Ort), nl,
-    write('Story-Fortschritt: Meilenstein '), write(Meilenstein), write(' abgeschlossen'), nl,
-    write('Verfügbare Verbindungen:'), nl,
-    findall(Ziel, verbindung(Ort, Ziel), Ziele),
-    liste_orte(Ziele).
-
-liste_orte([]) :-
-    write('- Keine verfügbaren Verbindungen'), nl.
-liste_orte([Ort|Rest]) :-
-    write('- '), write(Ort), nl,
-    liste_orte(Rest).
-
-% Spiel beenden
-beende_spiel :-
-    write('Danke fürs Spielen von SkyNet: Wings of Deception!'), nl,
+process_command([beende]) :-
+    write('Auf Wiedersehen! Die Wahrheit muss ans Licht...'), nl,
     halt.
 
-% Hauptprädikat zum Starten des Spiels
-start :- 
-    initialisiere_spiel,
-    write('Spiel gestartet. Vergiss nicht, einen Punkt nach jedem Befehl zu setzen!'), nl.
+process_command([hilfe]) :-
+    write('Verfügbare Befehle:'), nl,
+    write('- schaue: Beschreibung des aktuellen Ortes'), nl,
+    write('- gehe(richtung): Bewege dich zu einem anderen Ort'), nl,
+    write('- nimm(gegenstand): Nimm einen Gegenstand auf'), nl,
+    write('- verwende(gegenstand): Verwende einen Gegenstand'), nl,
+    write('- rede(person): Spreche mit einer Person'), nl,
+    write('- angriff(feind): Beginne Kampf gegen einen Feind'), nl,
+    write('- baue(item): Baue einen Gegenstand (nur in Werkstatt)'), nl,
+    write('- hack(ziel): Hacke ein Ziel'), nl,
+    write('- klettere: Klettere auf Dächer/Türme'), nl,
+    write('- inventar: Zeige dein Inventar'), nl,
+    write('- status: Zeige deinen Status'), nl,
+    write('- Richtungsbefehle: oben, unten, links, rechts, a, b'), nl,
+    write('  (Könnte für etwas Besonderes nützlich sein...)'), nl.
+
+process_command([schaue]) :-
+    look_around.
+
+process_command([gehe, Direction]) :-
+    move_player(Direction).
+
+process_command([nimm, Item]) :-
+    take_item(Item).
+
+process_command([verwende, Item]) :-
+    use_item(Item).
+
+process_command([rede, Person]) :-
+    talk_to(Person).
+
+process_command([angriff, Enemy]) :-
+    start_combat(Enemy).
+
+process_command([baue, Item]) :-
+    craft_item(Item).
+
+process_command([hack, Target]) :-
+    hack_target(Target).
+
+process_command([klettere]) :-
+    climb_action.
+
+process_command([inventar]) :-
+    show_inventory.
+
+process_command([status]) :-
+    show_status.
+
+% ========== CHEAT CODES (for testing) ==========
+process_command([cheat, heal]) :-
+    retract(player_health(_)),
+    assertz(player_health(100)),
+    write('Gesundheit wiederhergestellt!'), nl.
+
+process_command([cheat, items]) :-
+    assertz(player_inventory(coil)),
+    assertz(player_inventory(battery)),
+    assertz(player_inventory(capacitor)),
+    assertz(player_inventory(emp_granate)),
+    assertz(player_inventory(emp_granate)),
+    assertz(player_inventory(parkour_handschuhe)),
+    assertz(player_inventory(drohnen_motor)),
+    assertz(player_inventory(steuerungsmodul)),
+    assertz(player_inventory(heilspray)),
+    write('Alle Items erhalten!'), nl.
+
+process_command([cheat, components]) :-
+    assertz(player_inventory(coil)),
+    assertz(player_inventory(battery)),
+    assertz(player_inventory(capacitor)),
+    write('EMP-Generator Komponenten erhalten!'), nl.
+  
+
+process_command(_) :-
+    write('Unbekannter Befehl. Verwende "hilfe" für eine Liste der Befehle.'), nl.
+
+% ========== COMBAT COMMANDS ==========
+process_combat_command([angriff], Enemy) :-
+    combat_attack(Enemy).
+
+process_combat_command([verwende, Item], Enemy) :-
+    combat_use_item(Item, Enemy).
+
+process_combat_command([flucht], Enemy) :-
+    combat_flee(Enemy).
+
+process_combat_command(_, _) :-
+    write('Ungültige Kampfaktion! Verwende: angriff, verwende(item), oder flucht'), nl.
+
+% ========== CORE GAME MECHANICS ==========
+look_around :-
+    player_location(Loc),
+    location(Loc, Name, Desc),
+    write(Name), nl,
+    write(Desc), nl,
+    list_items_here(Loc),
+    list_npcs_here(Loc),
+    list_enemies_here(Loc),
+    list_exits(Loc),
+    check_obstacles_here(Loc).
+
+list_items_here(Loc) :-
+    findall(Item, item_location(Item, Loc), Items),
+    (Items = [] -> true ; 
+     (write('Gegenstände hier: '), write_list(Items), nl)).
+
+list_npcs_here(Loc) :-
+    findall(NPC, npc_location(NPC, Loc), NPCs),
+    (NPCs = [] -> true ; 
+     (write('Personen hier: '), write_list(NPCs), nl)).
+
+list_enemies_here(Loc) :-
+    findall(Enemy, enemy_location(Enemy, Loc), Enemies),
+    (Enemies = [] -> true ; 
+     (write('Feinde hier: '), write_list(Enemies), nl)).
+
+list_exits(Loc) :-
+    findall(Exit, connected(Loc, Exit), Exits),
+    (Exits = [] -> write('Keine Ausgänge.') ; 
+     (write('Ausgänge: '), write_list(Exits))), nl.
+
+check_obstacles_here(Loc) :-
+    findall(obstacle(Loc, Exit, ObstacleType), obstacle(Loc, Exit, ObstacleType), Obstacles),
+    (Obstacles = [] -> true ; list_obstacles(Obstacles)).
+
+list_obstacles([]).
+list_obstacles([obstacle(_, Exit, ObstacleType)|T]) :-
+    write('HINDERNIS nach '), write(Exit), write(': '), 
+    describe_obstacle(ObstacleType), nl,
+    list_obstacles(T).
+
+describe_obstacle(hohe_mauer) :-
+    write('Hohe Mauer - benötigt Parkour-Handschuhe zum Klettern').
+describe_obstacle(electric_fence) :-
+    write('Elektrischer Zaun - benötigt EMP-Granate').
+describe_obstacle(security_system) :-
+    write('Hochsicherheitssystem - benötigt EMP-Generator').
+
+write_list([]).
+write_list([H|T]) :-
+    write(H),
+    (T = [] -> true ; write(', ')),
+    write_list(T).
+
+% ========== MOVEMENT WITH OBSTACLES ==========
+move_player(Direction) :-
+    player_location(CurrentLoc),
+    connected(CurrentLoc, Direction),
+    (obstacle(CurrentLoc, Direction, ObstacleType) ->
+        handle_obstacle(ObstacleType, Direction) ;
+        (retract(player_location(CurrentLoc)),
+         assertz(player_location(Direction)),
+         write('Du gehst nach '), write(Direction), nl,
+         trigger_location_event(Direction))),
+    !.
+
+move_player(_) :-
+    write('Du kannst nicht dorthin gehen.'), nl.
+
+
+handle_obstacle(hohe_mauer, Direction) :-
+    (player_inventory(parkour_handschuhe) ->
+        (write('Du kletterst mit den Parkour-Handschuhen über die hohe Mauer!'), nl,
+         player_location(CurrentLoc),
+         retract(obstacle(CurrentLoc, Direction, hohe_mauer)),
+         retract(player_location(CurrentLoc)),
+         assertz(player_location(Direction)),
+         write('Du gehst nach '), write(Direction), nl) ;
+        write('Eine hohe Mauer blockiert deinen Weg! Du brauchst Parkour-Handschuhe.'), nl).
+
+handle_obstacle(electric_fence, Direction) :-
+    (player_inventory(emp_granate) ->
+        (write('Du wirfst eine EMP-Granate! Der elektrische Zaun fällt aus!'), nl,
+         retract(player_inventory(emp_granate)),
+         player_location(CurrentLoc),
+         retract(obstacle(CurrentLoc, Direction, electric_fence)),
+         retract(player_location(CurrentLoc)),
+         assertz(player_location(Direction)),
+         write('Du gehst nach '), write(Direction), nl) ;
+        write('Ein elektrischer Zaun blockiert den Weg! Du brauchst eine EMP-Granate.'), nl).
+
+handle_obstacle(security_system, Direction) :-
+    (player_inventory(emp_generator) ->
+        (write('Du aktivierst den EMP-Generator! Das Sicherheitssystem bricht zusammen!'), nl,
+         player_location(CurrentLoc),
+         retract(obstacle(CurrentLoc, Direction, security_system)),
+         retract(player_location(CurrentLoc)),
+         assertz(player_location(Direction)),
+         write('Du gehst nach '), write(Direction), nl) ;
+        write('Ein Hochsicherheitssystem blockiert den Zugang! Du brauchst einen EMP-Generator.'), nl).
+
+% ========== INVENTORY MANAGEMENT ==========
+take_item(ItemName) :-
+    player_location(Loc),
+    item_location(ItemName, Loc),
+    retract(item_location(ItemName, Loc)),
+    assertz(player_inventory(ItemName)),
+    item(ItemName, DisplayName, _),
+    write('Du nimmst '), write(DisplayName), write(' auf.'), nl,
+    !.
+
+take_item(_) :-
+    write('Diesen Gegenstand kannst du hier nicht finden.'), nl.
+
+use_item(ItemName) :-
+    player_inventory(ItemName),
+    execute_item_use(ItemName),
+    !.
+
+use_item(_) :-
+    write('Du hast diesen Gegenstand nicht oder kannst ihn nicht verwenden.'), nl.
+
+show_inventory :-
+    write('Dein Inventar:'), nl,
+    findall(Item, player_inventory(Item), Items),
+    (Items = [] -> write('Dein Inventar ist leer.') ; list_inventory_items(Items)), nl.
+
+list_inventory_items([]).
+list_inventory_items([H|T]) :-
+    item(H, DisplayName, Desc),
+    write('- '), write(DisplayName), write(': '), write(Desc), nl,
+    list_inventory_items(T).
+
+% ========== ITEM USAGE ==========
+execute_item_use(laptop) :-
+    player_location(htl_labor),
+    game_state(chapter, 1),
+    write('Du hackst dich in die Schulserver ein und analysierst die Drohnen-Aufnahmen.'), nl,
+    write('SCHOCKIERENDE ENTDECKUNG: Die Vögel sind Überwachungsdrohnen!'), nl,
+    retract(game_state(chapter, 1)),
+    assertz(game_state(chapter, 2)),
+    !.
+
+execute_item_use(heilspray) :-
+    player_health(Health),
+    (Health >= 100 ->
+        write('Du hast bereits volle Gesundheit!'), nl ;
+        (NewHealth is min(100, Health + 30),
+         retract(player_health(Health)),
+         assertz(player_health(NewHealth)),
+         write('Du verwendest das Heilspray und gewinnst 30 Gesundheitspunkte!'), nl,
+         retract(player_inventory(heilspray)))),
+    !.
+
+execute_item_use(_) :-
+    write('Du kannst diesen Gegenstand hier nicht verwenden.'), nl.
+
+% ========== TURN-BASED COMBAT SYSTEM ==========
+start_combat(EnemyName) :-
+    player_location(Loc),
+    enemy_location(EnemyName, Loc),
+    write('Du beginnst den Kampf gegen '), enemy(EnemyName, DisplayName, _, _),
+    write(DisplayName), write('!'), nl,
+    assertz(in_combat(EnemyName)),
+    !.
+
+start_combat(_) :-
+    write('Hier ist kein Feind zum Angreifen.'), nl.
+
+combat_attack(Enemy) :-
+    get_random_damage(Damage),
+    enemy(Enemy, DisplayName, Health, Desc),
+    NewHealth is Health - Damage,
+    write('Du greifst '), write(DisplayName), write(' an und verursachst '), 
+    write(Damage), write(' Schaden!'), nl,
+    retract(enemy(Enemy, DisplayName, Health, Desc)),
+    (NewHealth =< 0 ->
+        (write(DisplayName), write(' wurde besiegt!'), nl,
+         defeat_enemy(Enemy)) ;
+        (assertz(enemy(Enemy, DisplayName, NewHealth, Desc)),
+         enemy_turn(Enemy))).
+
+combat_use_item(ItemName, Enemy) :-
+    player_inventory(ItemName),
+    execute_combat_item_use(ItemName, Enemy),
+    enemy_turn(Enemy),
+    !.
+
+combat_use_item(_, _) :-
+    write('Du hast diesen Gegenstand nicht!'), nl.
+
+execute_combat_item_use(emp_granate, Enemy) :-
+    enemy(Enemy, DisplayName, Health, Desc),
+    (Enemy = die_kraehe ->
+        (write('Du schwächst die Krähe mit der EMP-Granate!'), nl,
+         retract(game_state(crow_weakened, false)),
+         assertz(game_state(crow_weakened, true)),
+         retract(player_inventory(emp_granate))) ;
+        (Damage = 40,
+         NewHealth is Health - Damage,
+         write('Die EMP-Granate verursacht '), write(Damage), write(' Schaden!'), nl,
+         retract(enemy(Enemy, DisplayName, Health, Desc)),
+         retract(player_inventory(emp_granate)),
+         (NewHealth =< 0 ->
+            (write(DisplayName), write(' wurde besiegt!'), nl,
+             defeat_enemy(Enemy)) ;
+            assertz(enemy(Enemy, DisplayName, NewHealth, Desc))))).
+
+execute_combat_item_use(kampfdrohne, Enemy) :-
+    enemy(Enemy, DisplayName, Health, Desc),
+    Damage = 25,
+    NewHealth is Health - Damage,
+    write('Deine Kampfdrohne greift an und verursacht '), write(Damage), write(' Schaden!'), nl,
+    retract(enemy(Enemy, DisplayName, Health, Desc)),
+    (NewHealth =< 0 ->
+        (write(DisplayName), write(' wurde besiegt!'), nl,
+         defeat_enemy(Enemy)) ;
+        assertz(enemy(Enemy, DisplayName, NewHealth, Desc))).
+
+execute_combat_item_use(heilspray, _) :-
+    execute_item_use(heilspray).
+
+combat_flee(Enemy) :-
+    write('Du fliehst aus dem Kampf!'), nl,
+    retract(in_combat(Enemy)),
+    % Teleport to a safe location
+    retract(player_location(_)),
+    assertz(player_location(htl_labor)).
+
+enemy_turn(Enemy) :-
+    enemy(Enemy, DisplayName, _, _),
+    (Enemy = die_kraehe, game_state(crow_weakened, false) ->
+        crow_mind_control ;
+        normal_enemy_attack(Enemy, DisplayName)).
+
+normal_enemy_attack(_, DisplayName) :-
+    get_random_enemy_damage(Damage),
+    player_health(Health),
+    NewHealth is Health - Damage,
+    write(DisplayName), write(' greift an und verursacht '), 
+    write(Damage), write(' Schaden!'), nl,
+    retract(player_health(Health)),
+    assertz(player_health(NewHealth)).
+
+crow_mind_control :-
+    write('Die Krähe übernimmt die Kontrolle über deinen Verstand!'), nl,
+    write('Du schlägst dich selbst!'), nl,
+    player_health(Health),
+    Damage = 20,
+    NewHealth is Health - Damage,
+    write('Du verursachst dir '), write(Damage), write(' Schaden!'), nl,
+    retract(player_health(Health)),
+    assertz(player_health(NewHealth)).
+
+check_combat_state(Enemy) :-
+    player_health(Health),
+    (Health =< 0 ->
+        end_game(defeat) ;
+        (enemy(Enemy, _, EnemyHealth, _) ->
+            (EnemyHealth =< 0 ->
+                true ; % Enemy defeated, handled in combat_attack
+                true) ;
+            % Enemy was defeated
+            retract(in_combat(Enemy)))).
+
+defeat_enemy(EnemyName) :-
+    retract(enemy_location(EnemyName, _)),
+    retract(in_combat(EnemyName)),
+    handle_enemy_defeat(EnemyName).
+
+handle_enemy_defeat(tauben_schwarm) :-
+    write('Die Tauben explodieren! Du findest ein Heilspray und einen Drohnen-Motor in den Trümmern.'), nl,
+    player_location(Loc),
+    assertz(item_location(drohnen_motor, Loc)),
+    assertz(item_location(heilspray, Loc)).
+
+handle_enemy_defeat(storch_drohne) :-
+    write('Die Storch-Drohne lässt ein Steuerungsmodul und EMP-Granaten fallen!'), nl,
+    player_location(Loc),
+    assertz(item_location(steuerungsmodul, Loc)),
+    assertz(item_location(emp_granate, Loc)).
+
+handle_enemy_defeat(die_kraehe) :-
+    write('Die Krähe ist besiegt! Das Drohnen-Netzwerk wankt...'), nl,
+    write('Du stehst vor der Hauptkonsole von Aviary Control.'), nl,
+    write('Plötzlich erscheint eine Nachricht auf dem Bildschirm:'), nl,
+    write('"Beeindruckend, John. Du hast es bis hierher geschafft."'), nl,
+    write('"Aber jetzt musst du eine Wahl treffen..."'), nl,
+    final_choice.
+
+
+% ========== CRAFTING SYSTEM ==========
+craft_item(emp_generator) :-
+    player_location(htl_leonding),
+    player_inventory(coil),
+    player_inventory(battery),
+    player_inventory(capacitor),
+    write('Du baust aus Spule, Batterie und Kondensator einen EMP-Generator!'), nl,
+    retract(player_inventory(coil)),
+    retract(player_inventory(battery)),
+    retract(player_inventory(capacitor)),
+    assertz(player_inventory(emp_generator)),
+    retract(game_state(emp_built, false)),
+    assertz(game_state(emp_built, true)),
+    !.
+
+craft_item(emp_generator) :-
+    player_location(htl_leonding),
+    write('Du brauchst: Elektro-Spule, Hochleistungsbatterie und Kondensator.'), nl,
+    !.
+
+craft_item(emp_generator) :-
+    write('Du kannst nur in der HTL Leonding Werkstatt bauen.'), nl,
+    !.
+
+craft_item(kampfdrohne) :-
+    player_location(htl_leonding),
+    player_inventory(drohnen_motor),
+    player_inventory(steuerungsmodul),
+    write('Du baust aus Motor und Steuerungsmodul eine Kampfdrohne!'), nl,
+    retract(player_inventory(drohnen_motor)),
+    retract(player_inventory(steuerungsmodul)),
+    assertz(player_inventory(kampfdrohne)),
+    !.
+
+craft_item(kampfdrohne) :-
+    player_location(htl_leonding),
+    write('Du brauchst: Drohnen-Motor und Steuerungsmodul um eine Kampfdrohne zu bauen.'), nl,
+    !.
+
+craft_item(kampfdrohne) :-
+    write('Du kannst nur in der HTL Leonding Werkstatt bauen.'), nl,
+    !.
+
+craft_item(_) :-
+    write('Du kannst diesen Gegenstand nicht bauen.'), nl.
+
+% ========== HACKING MINI-GAMES ==========
+hack_target(box) :-
+    player_location(Loc),
+    player_inventory(laptop),
+    hacking_minigame(Loc),
+    !.
+
+hack_target(_) :-
+    write('Du kannst dieses Ziel nicht hacken oder hast keinen Laptop.'), nl.
+
+hacking_minigame(altstadt) :-
+    box_unlocked(altstadt_box),
+    write('Diese Box wurde bereits gehackt.'), nl,
+    !.
+
+hacking_minigame(altstadt) :-
+    write('=== HACKING MINI-GAME ==='), nl,
+    write('Entschlüssele den Code: 1001 + 0110 = ?'), nl,
+    write('Gib das Ergebnis in binär ein: '),
+    read(Answer),
+    (Answer = 1111 ->
+        (write('Korrekt! Du findest eine Elektro-Spule in der Box!'), nl,
+         assertz(player_inventory(coil)),
+         assertz(box_unlocked(altstadt_box))) ;
+        (write('Falsch! Versuch es nochmal.'), nl,
+         fail)).
+
+hacking_minigame(donauufer) :-
+    box_unlocked(donauufer_box),
+    write('Diese Box wurde bereits gehackt.'), nl,
+    !.
+
+hacking_minigame(donauufer) :-
+    write('=== HACKING MINI-GAME ==='), nl,
+    write('SQL Injection: Welcher Befehl umgeht die Passwort-Abfrage?'), nl,
+    write('1) DROP TABLE users'), nl,
+    write('2) \' OR \'1\'=\'1'), nl,
+    write('3) SELECT * FROM passwords'), nl,
+    write('Deine Wahl (1-3): '),
+    read(Answer),
+    (Answer = 2 ->
+        (write('Korrekt! Du findest eine Hochleistungsbatterie in der Box!'), nl,
+         assertz(player_inventory(battery)),
+         assertz(box_unlocked(donauufer_box))) ;
+        (write('Falsch! Versuch es nochmal.'), nl,
+         fail)).
+
+hacking_minigame(poestlingberg) :-
+    box_unlocked(poestlingberg_box),
+    write('Diese Box wurde bereits gehackt.'), nl,
+    !.
+
+hacking_minigame(poestlingberg) :-
+    player_inventory(kampfdrohne),
+    write('=== DROHNEN-HACKING ==='), nl,
+    write('Deine Kampfdrohne verbindet sich mit der Box...'), nl,
+    write('Netzwerk-Port-Scan: Welcher Port ist für SSH Standard?'), nl,
+    write('1) Port 80'), nl,
+    write('2) Port 22'), nl,
+    write('3) Port 443'), nl,
+    write('Deine Wahl (1-3): '),
+    read(Answer),
+    (Answer = 2 ->
+        (write('Korrekt! Du findest einen Kondensator in der Box!'), nl,
+         assertz(player_inventory(capacitor)),
+         assertz(box_unlocked(poestlingberg_box))) ;
+        (write('Falsch! Versuch es nochmal.'), nl,
+         fail)).
+
+hacking_minigame(poestlingberg) :-
+    write('Du brauchst eine Kampfdrohne um diese Box zu hacken.'), nl.
+
+hacking_minigame(_) :-
+    write('Hier gibt es nichts zu hacken.'), nl.
+
+% ========== CLIMBING SYSTEM ==========
+climb_action :-
+    player_location(altstadt),
+    player_inventory(parkour_handschuhe),
+    write('Du kletterst mit den Parkour-Handschuhen auf das Dach!'), nl,
+    write('Du findest eine verschlossene Box auf dem Dach.'), nl,
+    write('Verwende "hack(box)" um sie zu öffnen.'), nl,
+    !.
+
+climb_action :-
+    player_location(altstadt),
+    write('Du brauchst Parkour-Handschuhe um auf das Dach zu klettern.'), nl,
+    !.
+
+climb_action :-
+    player_location(donauufer),
+    player_inventory(parkour_handschuhe),
+    write('Du kletterst auf den Turm!'), nl,
+    write('Oben ist ein elektrisches Schutzschild um eine Box.'), nl,
+    write('Du brauchst eine EMP-Granate um das Schild zu deaktivieren.'), nl,
+    (player_inventory(emp_granate) ->
+        (write('Du verwendest die EMP-Granate! Das Schild fällt aus!'), nl,
+         retract(player_inventory(emp_granate)),
+         write('Verwende "hack(box)" um die Box zu öffnen.'), nl) ;
+        true),
+    !.
+
+climb_action :-
+    player_location(donauufer),
+    write('Du brauchst Parkour-Handschuhe um auf den Turm zu klettern.'), nl,
+    !.
+
+climb_action :-
+    write('Hier gibt es nichts zum Klettern.'), nl.
+
+% ========== NPC INTERACTIONS ==========
+talk_to(PersonName) :-
+    player_location(Loc),
+    npc_location(PersonName, Loc),
+    handle_conversation(PersonName),
+    !.
+
+talk_to(_) :-
+    write('Diese Person ist nicht hier.'), nl.
+
+
+handle_conversation(wren) :-
+    game_state(wren_met, false),
+    write('Wren: "John! Ich habe auf dich gewartet. Ich weiß von den Drohnen."'), nl,
+    write('Wren: "Es gibt eine Organisation namens Aviary Control. Wir müssen sie stoppen!"'), nl,
+    write('Wren: "Du brauchst einen EMP-Generator um in ihr Hauptquartier einzudringen."'), nl,
+    write('Wren: "Sammle diese Komponenten: Elektro-Spule, Hochleistungsbatterie und Kondensator."'), nl,
+    write('Wren: "Die Spule findest du in einer Box auf einem Dach in der Altstadt."'), nl,
+    write('Wren: "Die Batterie ist in einer Box auf einem Turm im Donauufer versteckt."'), nl,
+    write('Wren: "Der Kondensator ist im Pöstlingberg-Turm, aber du brauchst eine Kampfdrohne."'), nl,
+    write('Wren: "Baue deine eigene Kampfdrohne! Besiege Tauben für einen Motor und Störche für Steuerung."'), nl,
+    write('Wren: "Baue alles dann in der HTL Leonding Werkstatt zusammen."'), nl,
+    write('Wren gibt dir EMP-Granaten für den Anfang.'), nl,
+    assertz(player_inventory(emp_granate)),
+    assertz(player_inventory(emp_granate)),
+    retract(game_state(wren_met, false)),
+    assertz(game_state(wren_met, true)),
+    retract(game_state(chapter, 2)),
+    assertz(game_state(chapter, 3)),
+    retract(game_state(components_explained, false)),
+    assertz(game_state(components_explained, true)),
+    !.
+
+handle_conversation(wren) :-
+    game_state(components_explained, true),
+    game_state(emp_built, false),
+    write('Wren: "Vergiss nicht: Du brauchst alle drei Komponenten für den EMP-Generator!"'), nl,
+    write('Wren: "Elektro-Spule (Altstadt-Dach), Batterie (Donauufer-Turm), Kondensator (Pöstlingberg)."'), nl,
+    write('Wren: "Verwende Parkour-Handschuhe zum Klettern und deine Kampfdrohne im Pöstlingberg."'), nl,
+    !.
+
+handle_conversation(wren) :-
+    game_state(emp_built, true),
+    write('Wren: "Perfekt! Mit dem EMP-Generator kannst du ins Aviary HQ eindringen!"'), nl,
+    write('Wren: "Pass auf die Krähe auf - schwäche sie mit EMP-Granaten, sonst kontrolliert sie dich!"'), nl,
+    !.
+
+handle_conversation(wren) :-
+    write('Wren: "Viel Glück, John. Die Zukunft der Menschheit liegt in deinen Händen."'), nl.
+
+% ========== LOCATION EVENTS ==========
+trigger_location_event(donauufer) :-
+    enemy_location(storch_drohne, donauufer),
+    write('WARNUNG: Eine Storch-Drohne patroulliert hier!'), nl,
+    write('Verwende "angriff(storch_drohne)" um den Kampf zu beginnen.'), nl.
+
+trigger_location_event(aviary_hq) :-
+    enemy_location(die_kraehe, aviary_hq),
+    write('Du betrittst das Hauptquartier von Aviary Control!'), nl,
+    write('Die Krähe erwartet dich bereits...'), nl,
+    write('WARNUNG: Die Krähe kann dich kontrollieren! Schwäche sie mit EMP-Granaten!'), nl.
+
+trigger_location_event(_).
+
+% ========== GAME STATE MANAGEMENT ==========
+check_game_state :-
+    player_health(Health),
+    (Health =< 0 -> end_game(defeat) ; true).
+
+show_status :-
+    player_health(Health),
+    game_state(chapter, Chapter),
+    write('=== STATUS ==='), nl,
+    write('Gesundheit: '), write(Health), nl,
+    write('Kapitel: '), write(Chapter), nl,
+    (player_inventory(kampfdrohne) ->
+        write('Kampfdrohne: ✓ Gebaut'), nl ;
+        (write('Kampfdrohne Komponenten:'), nl,
+         (player_inventory(drohnen_motor) -> write('  Drohnen-Motor: ✓') ; write('  Drohnen-Motor: ✗')), nl,
+         (player_inventory(steuerungsmodul) -> write('  Steuerungsmodul: ✓') ; write('  Steuerungsmodul: ✗')), nl)),
+    (game_state(emp_built, true) ->
+        write('EMP-Generator: ✓ Gebaut'), nl ;
+        (write('EMP-Generator Komponenten:'), nl,
+         (player_inventory(coil) -> write('  Elektro-Spule: ✓') ; write('  Elektro-Spule: ✗')), nl,
+         (player_inventory(battery) -> write('  Batterie: ✓') ; write('  Batterie: ✗')), nl,
+         (player_inventory(capacitor) -> write('  Kondensator: ✓') ; write('  Kondensator: ✗')), nl)),
+    write('=============='), nl.
+
+% ========== GAME ENDINGS ==========
+final_choice :-
+    write('=== FINALE ENTSCHEIDUNG ==='), nl,
+    write('Du hast drei Möglichkeiten:'), nl,
+    write('1) Das Hauptquartier mit einer EMP-Überladung zerstören (du stirbst dabei)'), nl,
+    write('2) Dich Aviary Control anschließen und die Welt beherrschen'), nl,
+    write('3) Das System hacken und die Kontrolle übernehmen'), nl,
+    write('Deine Wahl (1-3): '),
+    read(Choice),
+    handle_final_choice(Choice).
+
+handle_final_choice(1) :-
+    write('Du entscheidest dich für das ultimative Opfer...'), nl,
+    write('Du überlädst alle EMP-Generatoren und Granaten gleichzeitig.'), nl,
+    write('Die resultierende Explosion wird das gesamte Aviary-Netzwerk vernichten.'), nl,
+    write('Du weißt, dass du dabei sterben wirst, aber die Menschheit wird frei sein.'), nl,
+    write('Du drückst den roten Knopf...'), nl,
+    end_game(heroic_sacrifice).
+
+handle_final_choice(2) :-
+    write('Du blickst auf die Macht, die vor dir liegt...'), nl,
+    write('Warum gegen das System kämpfen, wenn du es beherrschen kannst?'), nl,
+    write('Du aktivierst die Aviary-Kontrolle und übernimmst das Drohnen-Netzwerk.'), nl,
+    write('Die Welt wird unter deiner Herrschaft "sicher" sein...'), nl,
+    write('Aber zu welchem Preis?'), nl,
+    end_game(dark_ruler).
+
+handle_final_choice(3) :-
+    player_inventory(master_key),
+    write('Du verwendest den Master-Schlüssel für vollständigen Systemzugriff...'), nl,
+    write('Mit diesem legendären Artefakt hackst du dich mühelos durch alle Sicherheitsebenen!'), nl,
+    write('Du übernimmst nicht nur die Kontrolle - du wirst zum Meister des Systems!'), nl,
+    write('Die Drohnen werden zu Beschützern der Freiheit umfunktioniert.'), nl,
+    write('Du etablierst ein neues Zeitalter der technologischen Harmonie!'), nl,
+    end_game(master_hacker_victory),
+    !.
+
+handle_final_choice(3) :-
+    write('Du versuchst das System zu hacken, aber die Sicherheit ist zu stark...'), nl,
+    write('Ohne die richtige Ausrüstung ist ein vollständiger Hack unmöglich.'), nl,
+    write('Du wirst entdeckt und gefangen genommen!'), nl,
+    write('(Hinweis: Es gibt einen geheimen Weg, diese Fähigkeit zu erlangen...)'), nl,
+    end_game(hack_failure).
+
+handle_final_choice(_) :-
+    write('Ungültige Wahl! Bitte wähle 1, 2 oder 3.'), nl,
+    final_choice.
+
+end_game(heroic_sacrifice) :-
+    write('=== HEROISCHES OPFER ==='), nl,
+    write('BOOOOOOM!'), nl,
+    write('Das Aviary HQ explodiert in einem blendenden Lichtblitz!'), nl,
+    write('Alle Drohnen weltweit fallen gleichzeitig vom Himmel.'), nl,
+    write('Die Menschen von Linz und der ganzen Welt sind frei!'), nl,
+    write('Du hast dein Leben für die Freiheit der Menschheit geopfert.'), nl,
+    write('Du wirst als Held in Erinnerung bleiben!'), nl,
+    write('ENDE: Der ultimative Held'), nl,
+    halt.
+
+end_game(dark_ruler) :-
+    write('=== DUNKLER HERRSCHER ==='), nl,
+    write('Die Drohnen schwärmen aus und überwachen jeden Winkel der Erde.'), nl,
+    write('Unter deiner Kontrolle gibt es keine Verbrechen, keine Unordnung...'), nl,
+    write('Aber auch keine Freiheit, keine Privatsphäre, keine Menschlichkeit.'), nl,
+    write('Du sitzt auf einem Thron aus Überwachung und Kontrolle.'), nl,
+    write('Die Welt ist "sicher" - aber zu welchem Preis?'), nl,
+    write('ENDE: Der neue Überwacher'), nl,
+    halt.
+
+end_game(master_hacker_victory) :-
+    write('=== MEISTER-HACKER TRIUMPH ==='), nl,
+    write('Mit dem Master-Schlüssel hast du göttliche Kontrolle über das Netzwerk erlangt!'), nl,
+    write('Du transformierst das gesamte System in einen Beschützer der Menschheit.'), nl,
+    write('Die Drohnen werden zu Helfern: Sie retten Menschen, schützen die Umwelt'), nl,
+    write('und überwachen nur noch wirkliche Bedrohungen.'), nl,
+    write('Du hast die perfekte Balance zwischen Sicherheit und Freiheit geschaffen!'), nl,
+    write('Die Welt ist in eine neue Ära des technologischen Friedens eingetreten.'), nl,
+    write('ENDE: Der Meister-Hacker (Geheimes Ende)'), nl,
+    halt.
+
+end_game(hack_failure) :-
+    write('=== HACK FEHLGESCHLAGEN ==='), nl,
+    write('Deine Hacking-Versuche wurden entdeckt!'), nl,
+    write('Sicherheitsdrohnen umzingeln dich!'), nl,
+    write('Du wurdest gefangen genommen und das System läuft weiter...'), nl,
+    write('GAME OVER'), nl,
+    write('Vielleicht gibt es einen anderen Weg... einen geheimen Code?'), nl,
+    write('Möchtest du es nochmal versuchen? Tippe "start_game." um neu zu beginnen.'), nl.
+
+end_game(defeat) :-
+    write('=== NIEDERLAGE ==='), nl,
+    write('Du wurdest von den Drohnen überwältigt.'), nl,
+    write('Die Wahrheit bleibt für immer begraben...'), nl,
+    write('GAME OVER'), nl,
+    write('Möchtest du es nochmal versuchen? Tippe "start_game." um neu zu beginnen.'), nl.
+
+% ========== UTILITY PREDICATES ==========
+get_random_damage(Damage) :-
+    random(15, 26, Damage).  % Random damage between 15-25
+
+get_random_enemy_damage(Damage) :-
+    random(8, 16, Damage).  % Random enemy damage between 8-15
+
+% ========== HELP PREDICATES ==========
+hilfe :- process_command([hilfe]).
+schaue :- process_command([schaue]).
+inventar :- process_command([inventar]).
+status :- process_command([status]).
+
+% Start predicate to begin the game
+:- initialization(start_game).
