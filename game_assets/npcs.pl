@@ -37,6 +37,7 @@ handle_conversation(wren) :-
     assertz(game_state(wren_met, true)),
     retract(game_state(components_explained, false)),
     assertz(game_state(components_explained, true)),
+    advance_chapter_if(1),
     !.
 
 handle_conversation(wren) :-
@@ -51,6 +52,7 @@ handle_conversation(wren) :-
     game_state(emp_built, true),
     write('Wren: "Perfekt! Mit dem EMP-Generator kannst du ins Aviary HQ eindringen!"'), nl,
     write('Wren: "Pass auf die Krähe auf - schwäche sie mit EMP-Granaten, sonst kontrolliert sie dich!"'), nl,
+    advance_chapter_if(4),
     !.
 
 handle_conversation(wren) :-

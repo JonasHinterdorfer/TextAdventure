@@ -27,6 +27,7 @@ execute_item_use(laptop) :-
     player_location(htl_labor),
     write('Du hackst dich in die Schulserver ein und analysierst die Drohnen-Aufnahmen.'), nl,
     write('SCHOCKIERENDE ENTDECKUNG: Die Vögel sind Überwachungsdrohnen!'), nl,
+    advance_chapter_if(0),
     !.
 
 execute_item_use(heilspray) :-

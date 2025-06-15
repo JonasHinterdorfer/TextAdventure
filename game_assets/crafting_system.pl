@@ -11,6 +11,7 @@ craft_item(emp_generator) :-
     assertz(player_inventory(emp_generator)),
     retract(game_state(emp_built, false)),
     assertz(game_state(emp_built, true)),
+    advance_chapter_if(3),
     !.
 
 craft_item(emp_generator) :-
@@ -22,6 +23,9 @@ craft_item(emp_generator) :-
     write('Du kannst nur in der HTL Leonding Werkstatt bauen.'), nl,
     !.
 
+craft_item(_) :-
+    write('Du kannst diesen Gegenstand nicht bauen.'), nl.
+
 craft_item(kampfdrohne) :-
     player_location(htl_werkstatt),
     player_inventory(drohnen_motor),
@@ -30,6 +34,7 @@ craft_item(kampfdrohne) :-
     retract(player_inventory(drohnen_motor)),
     retract(player_inventory(steuerungsmodul)),
     assertz(player_inventory(kampfdrohne)),
+    advance_chapter_if(2),
     !.
 
 craft_item(kampfdrohne) :-

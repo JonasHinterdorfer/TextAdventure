@@ -35,6 +35,7 @@ init_game :-
     retractall(emp_used_in_combat(_)),
     retractall(drone_cooldown(_, _)),
     retractall(health_recovery_used(_, _)),
+    retractall(chapter(_)),
 
     % Initialize random number generator
     randomize,
@@ -48,6 +49,7 @@ init_game :-
     assertz(game_state(components_explained, false)),
     assertz(game_state(konami_unlocked, false)),
     assertz(drone_cooldown(none, 0)),
+    assertz(chapter(0)),
 
     % Initialize obstacles
     init_obstacles.
