@@ -7,8 +7,6 @@
 :- dynamic(enemy_location/2).
 :- dynamic(item_location/2).
 :- dynamic(enemy/4).
-:- dynamic(enemy_hacked/1).
-:- dynamic(hack_attempted/1).
 :- dynamic(obstacle/3).
 :- dynamic(box_unlocked/1).
 :- dynamic(in_combat/1).
