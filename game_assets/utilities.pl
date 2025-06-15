@@ -37,3 +37,7 @@ read_sequence(Sequence) :-
 
 clear_screen :-
     catch(shell('clear'), _, (catch(shell('cls'), _, fail))).
+
+end_game :-
+    write('Auf Wiedersehen! Die Wahrheit muss ans Licht...'), nl,
+    halt.
