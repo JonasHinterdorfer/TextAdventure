@@ -36,6 +36,7 @@ start_combat(EnemyName) :-
     enemy_location(EnemyName, Loc),
     assertz(drone_cooldown(EnemyName, 0)),
     assertz(health_recovery_used(EnemyName, 0)),
+    assertz(enemy_hack_attempted(EnemyName, false)),
     write('Du beginnst den Kampf gegen '), enemy(EnemyName, DisplayName, _, _),
     write(DisplayName), write('!'), nl,
     assertz(in_combat(EnemyName)),
@@ -142,16 +143,132 @@ execute_combat_item_use(kampfdrohne, Enemy) :-
         (assertz(enemy(Enemy, DisplayName, NewHealth, Desc)),
          enemy_turn(Enemy))).
 
+execute_combat_item_use(laptop, Enemy) :-
+    hack_enemy(Enemy).
+
 execute_combat_item_use(heilspray, _) :-
     execute_item_use(heilspray).
 
 execute_combat_item_use(Item, _) :-
-    \+ member(Item, [emp_granate, kampfdrohne, heilspray]),
+    \+ member(Item, [emp_granate, kampfdrohne, laptop, heilspray]),
     item(Item, DisplayName, _),
     write(DisplayName), write(' kann nicht im Kampf verwendet werden!'), nl.
 
 execute_combat_item_use(Item, _) :-
     write(Item), write(' kann nicht im Kampf verwendet werden!'), nl.
+
+% ========== ENEMY HACKING SYSTEM ==========
+hack_enemy(Enemy) :-
+    enemy_hack_attempted(Enemy, true),
+    write('Du hast bereits versucht, diesen Feind zu hacken!'), nl,
+    !.
+
+hack_enemy(Enemy) :-
+    retract(enemy_hack_attempted(Enemy, false)),
+    assertz(enemy_hack_attempted(Enemy, true)),
+    enemy(Enemy, DisplayName, _, _),
+    write('=== FEIND HACKEN ==='), nl,
+    write('Du versuchst '), write(DisplayName), write(' zu hacken...'), nl,
+    enemy_hacking_minigame(Enemy).
+
+% ========== ENEMY HACKING MINI-GAMES ==========
+% Tauben-Schwarm: 1 Frage (Einfach)
+enemy_hacking_minigame(tauben_schwarm) :-
+    write('=== SCHWARM-NETZWERK INFILTRATION ==='), nl,
+    write('Welches Protokoll verwenden IoT-Geräte hauptsächlich für Machine-to-Machine Kommunikation?'), nl,
+    write('1) HTTP'), nl,
+    write('2) MQTT'), nl,
+    write('3) FTP'), nl,
+    write('4) SMTP'), nl,
+    write('Deine Wahl (1-4): '),
+    read(Answer),
+    (Answer = 2 ->
+        successful_hack(tauben_schwarm, 25) ;
+        failed_hack(tauben_schwarm)).
+
+% Storch-Drohne: 2 Fragen (Mittel)
+enemy_hacking_minigame(storch_drohne) :-
+    write('=== KAMPFDROHNEN-SYSTEM HACKEN ==='), nl,
+    write('Frage 1/2: In welcher Schicht des OSI-Modells arbeiten Router hauptsächlich?'), nl,
+    write('1) Layer 2 (Data Link)'), nl,
+    write('2) Layer 7 (Application)'), nl,
+    write('3) Layer 4 (Transport)'), nl,
+    write('4) Layer 3 (Network)'), nl,
+    write('Deine Wahl (1-4): '),
+    read(Answer1),
+    (Answer1 = 4 ->
+        (write('Korrekt! Nächste Frage...'), nl,
+         write('Frage 2/2: Welcher Angriff nutzt Buffer Overflow aus?'), nl,
+         write('1) Return-to-libc'), nl,
+         write('2) Man-in-the-Middle'), nl,
+         write('3) Cross-Site Scripting'), nl,
+         write('4) DNS Spoofing'), nl,
+         write('Deine Wahl (1-4): '),
+         read(Answer2),
+         (Answer2 = 1 ->
+            successful_hack(storch_drohne, 35) ;
+            failed_hack(storch_drohne))) ;
+        failed_hack(storch_drohne)).
+
+% Die Krähe: 3 Fragen (Schwer)
+enemy_hacking_minigame(die_kraehe) :-
+    write('=== MASTER-KI INFILTRATION ==='), nl,
+    write('Frage 1/3: Welche Verschlüsselung ist quantenresistent?'), nl,
+    write('1) RSA-2048'), nl,
+    write('2) Lattice-based Cryptography'), nl,
+    write('3) Elliptic Curve'), nl,
+    write('Deine Wahl (1-3): '),
+    read(Answer1),
+    (Answer1 = 2 ->
+        (write('Korrekt! Nächste Frage...'), nl,
+         write('Frage 2/3: Was ist ein Zero-Day Exploit?'), nl,
+         write('1) Ein Exploit ohne bekannte Patches'), nl,
+         write('2) Ein Exploit, der täglich funktioniert'), nl,
+         write('3) Ein Exploit, der sofort erkannt wird'), nl,
+         write('4) Ein Exploit mit null Schaden'), nl,
+         write('Deine Wahl (1-4): '),
+         read(Answer2),
+         (Answer2 = 1 ->
+            (write('Korrekt! Letzte Frage...'), nl,
+             write('Frage 3/3: Welche Technik verwendet ROP (Return-Oriented Programming)?'), nl,
+             write('1) Heap Spraying'), nl,
+             write('2) Code Injection'), nl,
+             write('3) Gadget Chaining'), nl,
+             write('4) Format String Bugs'), nl,
+             write('Deine Wahl (1-4): '),
+             read(Answer3),
+             (Answer3 = 3 ->
+                successful_hack(die_kraehe, 50) ;
+                failed_hack(die_kraehe))) ;
+            failed_hack(die_kraehe))) ;
+        failed_hack(die_kraehe)).
+
+% ========== HACK RESULTS ==========
+successful_hack(Enemy, Damage) :-
+    enemy(Enemy, DisplayName, Health, Desc),
+    write('*** HACK ERFOLGREICH ***'), nl,
+    write('Du übernimmst temporär die Kontrolle über '), write(DisplayName), write('!'), nl,
+    write('Der Feind greift sich selbst an und erleidet '), write(Damage), write(' Schaden!'), nl,
+    NewHealth is Health - Damage,
+    retract(enemy(Enemy, DisplayName, Health, Desc)),
+    (NewHealth =< 0 ->
+        (write(DisplayName), write(' wurde durch den Hack zerstört!'), nl,
+         defeat_enemy(Enemy)) ;
+        (assertz(enemy(Enemy, DisplayName, NewHealth, Desc)),
+         write('Das System erholt sich... Der Feind ist wieder unter eigener Kontrolle.'), nl,
+         enemy_turn(Enemy))).
+
+failed_hack(Enemy) :-
+    enemy(Enemy, DisplayName, _, _),
+    write('*** HACK FEHLGESCHLAGEN ***'), nl,
+    write('Dein Hack-Versuch wurde von '), write(DisplayName), write(' erkannt!'), nl,
+    write('Das System verstärkt seine Verteidigung und greift zurück!'), nl,
+    % Enemy gets an extra strong attack for failed hack
+    get_random_enemy_damage(BaseDamage),
+    ExtraDamage is BaseDamage + 10,
+    damage_player(ExtraDamage),
+    write(DisplayName), write(' führt einen verstärkten Gegenangriff aus und verursacht '), 
+    write(ExtraDamage), write(' Schaden!'), nl.
 
 % ========== ENEMY-ATTACKS/DEFEAT ==========
 enemy_turn(Enemy) :-
@@ -185,4 +302,5 @@ defeat_enemy(EnemyName) :-
     retractall(emp_used_in_combat(EnemyName)),
     retractall(drone_cooldown(EnemyName, _)),
     retractall(health_recovery_used(EnemyName, _)),
+    retractall(enemy_hack_attempted(EnemyName, _)),
     nl.
