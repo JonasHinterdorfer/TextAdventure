@@ -20,6 +20,7 @@
 :- dynamic(konami_sequence/1).
 :- dynamic(konami_position/1).
 :- dynamic(emp_used_in_combat/1).
+:- dynamic(drone_cooldown/2).
 
 % ========== INITIALIZATION ==========
 init_game :-
@@ -35,6 +36,7 @@ init_game :-
     retractall(hack_attempted(_)),
     retractall(crow_weakened(_)),
     retractall(emp_used_in_combat(_)),
+    retractall(drone_cooldown(_, _)),
 
     % Initialize random number generator
     randomize,
@@ -47,6 +49,7 @@ init_game :-
     assertz(game_state(crow_weakened, false)),
     assertz(game_state(components_explained, false)),
     assertz(game_state(konami_unlocked, false)),
+    assertz(drone_cooldown(none, 0)),
 
     % Initialize obstacles
     init_obstacles.
@@ -516,6 +519,7 @@ execute_item_use(_) :-
 start_combat(EnemyName) :-
     player_location(Loc),
     enemy_location(EnemyName, Loc),
+    assertz(drone_cooldown(EnemyName, 0)),
     write('Du beginnst den Kampf gegen '), enemy(EnemyName, DisplayName, _, _),
     write(DisplayName), write('!'), nl,
     assertz(in_combat(EnemyName)),
@@ -570,16 +574,26 @@ execute_combat_item_use(emp_granate, Enemy) :-
              enemy_turn(Enemy))))).
 
 execute_combat_item_use(kampfdrohne, Enemy) :-
+    drone_cooldown(Enemy, Cooldown),
+    Cooldown > 0,
+    write('Deine Kampfdrohne lädt noch auf! Cooldown: '), write(Cooldown), write(' Runden.'), nl,
+    !.
+
+execute_combat_item_use(kampfdrohne, Enemy) :-
     enemy(Enemy, DisplayName, Health, Desc),
     Damage = 25,
     NewHealth is Health - Damage,
     write('Deine Kampfdrohne greift an und verursacht '), write(Damage), write(' Schaden!'), nl,
+    write('Die Drohne muss sich jetzt 2 Runden lang aufladen.'), nl,
+    % Set cooldown to 2 turns
+    retract(drone_cooldown(Enemy, _)),
+    assertz(drone_cooldown(Enemy, 2)),
     retract(enemy(Enemy, DisplayName, Health, Desc)),
     (NewHealth =< 0 ->
         (write(DisplayName), write(' wurde besiegt!'), nl,
          defeat_enemy(Enemy)) ;
-        assertz(enemy(Enemy, DisplayName, NewHealth, Desc)),
-        enemy_turn(Enemy)).
+        (assertz(enemy(Enemy, DisplayName, NewHealth, Desc)),
+         enemy_turn(Enemy))).
 
 execute_combat_item_use(heilspray, _) :-
     execute_item_use(heilspray).
@@ -593,6 +607,12 @@ execute_combat_item_use(Item, _) :-
     write(Item), write(' kann nicht im Kampf verwendet werden!'), nl.
 
 enemy_turn(Enemy) :-
+    drone_cooldown(Enemy, Cooldown),
+    (Cooldown > 0 ->
+        (NewCooldown is Cooldown - 1,
+         retract(drone_cooldown(Enemy, Cooldown)),
+         assertz(drone_cooldown(Enemy, NewCooldown))) ;
+        true),
     enemy(Enemy, DisplayName, _, _),
     (Enemy = die_kraehe, game_state(crow_weakened, false) ->
         crow_mind_control ;
@@ -615,6 +635,7 @@ defeat_enemy(EnemyName) :-
     retract(in_combat(EnemyName)),
     handle_enemy_defeat(EnemyName),
     retractall(emp_used_in_combat(EnemyName)),
+    retractall(drone_cooldown(EnemyName, _)),
     nl.
 
 handle_enemy_defeat(tauben_schwarm) :-
@@ -1076,10 +1097,10 @@ end_game(defeat) :-
 
 % ========== UTILITY PREDICATES ==========
 get_random_damage(Damage) :-
-    random(15, 26, Damage).  % Random damage between 15-25
+    random(12, 20, Damage).  % Random damage between 12-20
 
 get_random_enemy_damage(Damage) :-
-    random(8, 16, Damage).  % Random enemy damage between 8-15
+    random(10, 18, Damage).  % Random enemy damage between 10-18
 
 damage_player(Damage) :-
     player_health(Health),
