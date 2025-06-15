@@ -67,3 +67,23 @@ init_enemies :-
     assertz(enemy_location(tauben_schwarm, altstadt)),
     assertz(enemy_location(storch_drohne, donauufer)),
     assertz(enemy_location(die_kraehe, aviary_hq)).
+
+handle_enemy_defeat(tauben_schwarm) :-
+    write('Die Tauben explodieren! Du findest ein Heilspray und einen Drohnen-Motor in den Trümmern.'), nl,
+    player_location(Loc),
+    assertz(item_location(drohnen_motor, Loc)),
+    assertz(item_location(heilspray, Loc)).
+
+handle_enemy_defeat(storch_drohne) :-
+    write('Die Storch-Drohne lässt ein Steuerungsmodul und EMP-Granaten fallen!'), nl,
+    player_location(Loc),
+    assertz(item_location(steuerungsmodul, Loc)),
+    assertz(item_location(emp_granate, Loc)).
+
+handle_enemy_defeat(die_kraehe) :-
+    write('Die Krähe ist besiegt! Das Drohnen-Netzwerk wankt...'), nl,
+    write('Du stehst vor der Hauptkonsole von Aviary Control.'), nl,
+    write('Plötzlich erscheint eine Nachricht auf dem Bildschirm:'), nl,
+    write('"Beeindruckend, John. Du hast es bis hierher geschafft."'), nl,
+    write('"Aber jetzt musst du eine Wahl treffen..."'), nl,
+    final_choice.

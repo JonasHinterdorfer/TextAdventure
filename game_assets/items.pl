@@ -21,3 +21,24 @@ init_items :-
     assertz(item_location(emp_granate, htl_werkstatt)),
     assertz(item_location(parkour_handschuhe, altstadt)),
     assertz(item_location(heilspray, htl_labor)).
+
+% ========== ITEM USAGE ==========
+execute_item_use(laptop) :-
+    player_location(htl_labor),
+    write('Du hackst dich in die Schulserver ein und analysierst die Drohnen-Aufnahmen.'), nl,
+    write('SCHOCKIERENDE ENTDECKUNG: Die Vögel sind Überwachungsdrohnen!'), nl,
+    !.
+
+execute_item_use(heilspray) :-
+    player_health(Health),
+    (Health >= 100 ->
+        write('Du hast bereits volle Gesundheit!'), nl ;
+        (NewHealth is min(100, Health + 30),
+         retract(player_health(Health)),
+         assertz(player_health(NewHealth)),
+         write('Du verwendest das Heilspray und gewinnst 30 Gesundheitspunkte!'), nl,
+         retract(player_inventory(heilspray)))),
+    !.
+
+execute_item_use(_) :-
+    write('Du kannst diesen Gegenstand hier nicht verwenden.'), nl.

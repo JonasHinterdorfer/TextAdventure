@@ -28,30 +28,3 @@ connected(donauufer, poestlingberg).
 connected(poestlingberg, donauufer).
 connected(poestlingberg, aviary_hq).
 connected(aviary_hq, poestlingberg).
-
-% ========== OBSTACLES ==========
-init_obstacles :-
-    % Obstacle between altstadt and donauufer
-    assertz(obstacle(altstadt, donauufer, hohe_mauer)),
-    assertz(obstacle(donauufer, altstadt, hohe_mauer)),
-    
-    % Obstacle between donauufer and poestlingberg  
-    assertz(obstacle(donauufer, poestlingberg, drone_swarm)),
-    assertz(obstacle(poestlingberg, donauufer, drone_swarm)),
-    
-    % Obstacle to aviary_hq
-    assertz(obstacle(poestlingberg, aviary_hq, security_system)),
-    assertz(obstacle(aviary_hq, poestlingberg, security_system)).
-
-list_obstacles([]).
-list_obstacles([obstacle(_, Exit, ObstacleType)|T]) :-
-    write('HINDERNIS nach '), write(Exit), write(': '), 
-    describe_obstacle(ObstacleType), nl,
-    list_obstacles(T).
-
-describe_obstacle(hohe_mauer) :-
-    write('Hohe Mauer - benötigt Parkour-Handschuhe zum Klettern').
-describe_obstacle(drone_swarm) :-
-    write('Drohnen-Schwarm - benötigt Kampfdrohne zur Abwehr').
-describe_obstacle(security_system) :-
-    write('Hochsicherheitssystem - benötigt EMP-Generator').
