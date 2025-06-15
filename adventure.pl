@@ -2,6 +2,9 @@
 % Von Zsombor Matyas und Jonas Hinterdorfer
 
 :- include('game_assets/locations.pl').
+:- include('game_assets/items.pl').
+:- include('game_assets/npcs.pl').
+:- include('game_assets/utilities.pl').
 
 % ========== GAME STATE ==========
 :- dynamic(player_location/1).
@@ -57,52 +60,6 @@ init_game :-
 
     % Initialize obstacles
     init_obstacles.
-
-% ========== ITEMS ==========
-item(laptop, 'Laptop', 'Dein vertrauter Laptop mit Hacking-Software.').
-item(emp_granate, 'EMP-Granate', 'Eine elektromagnetische Impulsgranate gegen elektrische Systeme.').
-item(parkour_handschuhe, 'Parkour-Handschuhe', 'Verbessern deinen Grip beim Klettern.').
-item(kampfdrohne, 'Kampfdrohne', 'Deine selbstgebaute Verteidigungsdrohne.').
-item(emp_generator, 'EMP-Generator', 'Ein mächtiger EMP-Generator gegen das Sischerheitssytem des Aviary HQs.').
-item(spule, 'Elektro-Spule', 'Eine hochwertige Induktionsspule.').
-item(batterie, 'Hochleistungsbatterie', 'Eine spezielle Batterie für EMP-Geräte.').
-item(kondensator, 'Kondensator', 'Ein Hochspannungskondensator.').
-item(heilspray, 'Heilspray', 'Regeneriert 30 Gesundheitspunkte.').
-item(drohnen_motor, 'Drohnen-Motor', 'Ein kleiner Motor für Drohnen-Antrieb.').
-item(steuerungsmodul, 'Steuerungsmodul', 'Elektronisches Modul zur Drohnen-Steuerung.').
-item(master_schluessel, 'Master-Schlüssel', 'Ein geheimnisvoller Schlüssel mit Aviary-Logo. Gewährt vollständigen Systemzugriff.').
-
-% Initial item locations
-init_items :-
-    retractall(item_location(_, _)),
-    retractall(player_inventory(_)),
-    assertz(player_inventory(laptop)),
-    assertz(item_location(emp_granate, htl_werkstatt)),
-    assertz(item_location(emp_granate, htl_werkstatt)),
-    assertz(item_location(parkour_handschuhe, altstadt)),
-    assertz(item_location(heilspray, htl_labor)).
-
-% ========== CHARACTERS ==========
-character(john, 'John Miller', 'Ein 17-jähriger HTL-Schüler mit Hacking-Fähigkeiten.').
-character(wren, 'Wren', 'Cybersicherheitslehrerin und Rogue-Hackerin.').
-character(die_kraehe, 'Die Krähe', 'KI-Mastermind hinter dem Drohnen-Netzwerk.').
-
-% Initial NPC locations
-init_npcs :-
-    retractall(npc_location(_, _)),
-    assertz(npc_location(wren, htl_labor)).
-
-% ========== ENEMIES ==========
-init_enemies :-
-    retractall(enemy(_, _, _, _)),
-    retractall(enemy_location(_, _)),
-    assertz(enemy(tauben_schwarm, 'Tauben-Schwarm', 50, 'Metallische Tauben mit roten LED-Augen.')),
-    assertz(enemy(storch_drohne, 'Storch-Drohne', 80, 'Große, gepanzerte Kampfdrohne.')),
-    assertz(enemy(die_kraehe, 'Die Krähe', 150, 'Monströse KI-Drohne mit Gedankenkontrolle.')),
-   
-    assertz(enemy_location(tauben_schwarm, altstadt)),
-    assertz(enemy_location(storch_drohne, donauufer)),
-    assertz(enemy_location(die_kraehe, aviary_hq)).
 
 % ========== MAIN GAME PREDICATES ==========
 start_game :-
@@ -373,12 +330,6 @@ describe_obstacle(drone_swarm) :-
     write('Drohnen-Schwarm - benötigt Kampfdrohne zur Abwehr').
 describe_obstacle(security_system) :-
     write('Hochsicherheitssystem - benötigt EMP-Generator').
-
-write_list([]).
-write_list([H|T]) :-
-    write(H),
-    (T = [] -> true ; write(', ')),
-    write_list(T).
 
 % ========== MOVEMENT WITH OBSTACLES ==========
 move_player(Direction) :-
@@ -1116,41 +1067,6 @@ handle_game_over_choice(2) :-
 handle_game_over_choice(_) :-
     write('Ungültige Wahl! Bitte wähle 1, 2 oder 3.'), nl,
     game_over_menu.
-
-
-% ========== UTILITY PREDICATES ==========
-get_random_damage(Damage) :-
-    random(12, 21, Damage).  % Random damage between 12-20
-
-get_random_enemy_damage(Damage) :-
-    random(10, 19, Damage).  % Random enemy damage between 10-18
-
-damage_player(Damage) :-
-    player_health(Health),
-    NewHealth is Health - Damage,
-    retract(player_health(Health)),
-    assertz(player_health(NewHealth)).
-
-random_member(Element, List) :-
-    length(List, Length),
-    Length > 0,
-    random(0, Length, RandomIndex),
-    nth0(RandomIndex, List, Element).
-
-write_sequence([]).
-write_sequence([H|T]) :-
-    write(H),
-    (T = [] -> true ; write(' -> ')),
-    write_sequence(T).
-
-read_sequence(Sequence) :-
-    read(Input),
-    (is_list(Input) ->
-        Sequence = Input ;
-        Sequence = [Input]).
-
-clear_screen :-
-    catch(shell('clear'), _, (catch(shell('cls'), _, fail))).
 
 % ========== HELP PREDICATES ==========
 hilfe :- process_command([hilfe]).
