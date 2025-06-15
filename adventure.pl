@@ -21,6 +21,7 @@
 :- dynamic(konami_position/1).
 :- dynamic(emp_used_in_combat/1).
 :- dynamic(drone_cooldown/2).
+:- dynamic(health_recovery_used/2).
 
 % ========== INITIALIZATION ==========
 init_game :-
@@ -37,6 +38,7 @@ init_game :-
     retractall(crow_weakened(_)),
     retractall(emp_used_in_combat(_)),
     retractall(drone_cooldown(_, _)),
+    retractall(health_recovery_used(_, _)),
 
     % Initialize random number generator
     randomize,
@@ -187,7 +189,10 @@ combat_loop(Enemy) :-
     write('Feind Gesundheit: '), write(Health), nl,
     player_health(PlayerHealth),
     write('Deine Gesundheit: '), write(PlayerHealth), nl,
-    write('Verfügbare Aktionen: angriff, verwende(item)'), nl, nl,
+    health_recovery_used(Enemy, RecoveryUsed),
+    RemainingRecovery is 2 - RecoveryUsed,
+    write('Heilungen übrig: '), write(RemainingRecovery), write('/2'), nl,
+    write('Verfügbare Aktionen: angriff, verwende(item), heile'), nl, nl,
     write('> '),
     read_line(Command),
     process_combat_command(Command, Enemy),
@@ -357,6 +362,9 @@ process_combat_command([angriff], Enemy) :-
 process_combat_command([verwende, Item], Enemy) :-
     combat_use_item(Item, Enemy).
 
+process_combat_command([heile], Enemy) :-
+    combat_heal(Enemy).
+
 process_combat_command(_, _) :-
     write('Ungültige Kampfaktion! Verwende: angriff oder verwende(item)'), nl.
 
@@ -520,6 +528,7 @@ start_combat(EnemyName) :-
     player_location(Loc),
     enemy_location(EnemyName, Loc),
     assertz(drone_cooldown(EnemyName, 0)),
+    assertz(health_recovery_used(EnemyName, 0)),
     write('Du beginnst den Kampf gegen '), enemy(EnemyName, DisplayName, _, _),
     write(DisplayName), write('!'), nl,
     assertz(in_combat(EnemyName)),
@@ -548,6 +557,36 @@ combat_use_item(ItemName, Enemy) :-
 
 combat_use_item(_, _) :-
     write('Du hast diesen Gegenstand nicht!'), nl.
+
+combat_heal(Enemy) :-
+    health_recovery_used(Enemy, Used),
+    Used >= 2,
+    write('Du hast bereits alle Heilungen in diesem Kampf verbraucht!'), nl,
+    !.
+
+combat_heal(_) :-
+    player_health(CurrentHealth),
+    CurrentHealth >= 100,
+    write('Du hast bereits volle Gesundheit!'), nl,
+    !.
+
+combat_heal(Enemy) :-
+    health_recovery_used(Enemy, Used),
+    Used < 2,
+    random(19, 31, HealAmount), 
+    player_health(CurrentHealth),
+    NewHealth is min(100, CurrentHealth + HealAmount),
+    HealedAmount is NewHealth - CurrentHealth,
+    retract(player_health(CurrentHealth)),
+    assertz(player_health(NewHealth)),
+    NewUsed is Used + 1,
+    retract(health_recovery_used(Enemy, Used)),
+    assertz(health_recovery_used(Enemy, NewUsed)),
+    write('Du heilst dich selbst und gewinnst '), write(HealedAmount), 
+    write(' Gesundheitspunkte!'), nl,
+    RemainingUses is 2 - NewUsed,
+    write('Verbleibende Heilungen: '), write(RemainingUses), nl,
+    enemy_turn(Enemy).
 
 execute_combat_item_use(emp_granate, Enemy) :-
     emp_used_in_combat(Enemy),
@@ -636,6 +675,7 @@ defeat_enemy(EnemyName) :-
     handle_enemy_defeat(EnemyName),
     retractall(emp_used_in_combat(EnemyName)),
     retractall(drone_cooldown(EnemyName, _)),
+    retractall(health_recovery_used(EnemyName, _)),
     nl.
 
 handle_enemy_defeat(tauben_schwarm) :-
@@ -1123,10 +1163,10 @@ handle_game_over_choice(_) :-
 
 % ========== UTILITY PREDICATES ==========
 get_random_damage(Damage) :-
-    random(12, 20, Damage).  % Random damage between 12-20
+    random(12, 21, Damage).  % Random damage between 12-20
 
 get_random_enemy_damage(Damage) :-
-    random(10, 18, Damage).  % Random enemy damage between 10-18
+    random(10, 19, Damage).  % Random enemy damage between 10-18
 
 damage_player(Damage) :-
     player_health(Health),
