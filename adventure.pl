@@ -19,6 +19,7 @@
 :- dynamic(combat_turn/1).
 :- dynamic(konami_sequence/1).
 :- dynamic(konami_position/1).
+:- dynamic(emp_used_in_combat/1).
 
 % ========== INITIALIZATION ==========
 init_game :-
@@ -33,6 +34,7 @@ init_game :-
     retractall(enemy_hacked(_)),
     retractall(hack_attempted(_)),
     retractall(crow_weakened(_)),
+    retractall(emp_used_in_combat(_)),
 
     % Initialize random number generator
     randomize,
@@ -88,7 +90,7 @@ init_obstacles :-
     
     % Obstacle between donauufer and poestlingberg  
     assertz(obstacle(donauufer, poestlingberg, drone_swarm)),
-    assertz(obstacle(poestlingberg, donauufer, drone_swarm)).
+    assertz(obstacle(poestlingberg, donauufer, drone_swarm)),
     
     % Obstacle to aviary_hq
     assertz(obstacle(poestlingberg, aviary_hq, security_system)),
@@ -99,20 +101,22 @@ item(laptop, 'Laptop', 'Dein vertrauter Laptop mit Hacking-Software.').
 item(emp_granate, 'EMP-Granate', 'Eine elektromagnetische Impulsgranate gegen elektrische Systeme.').
 item(parkour_handschuhe, 'Parkour-Handschuhe', 'Verbessern deinen Grip beim Klettern.').
 item(kampfdrohne, 'Kampfdrohne', 'Deine selbstgebaute Verteidigungsdrohne.').
-item(emp_generator, 'EMP-Generator', 'Ein mächtiger EMP-Generator gegen die Krähe.').
-item(coil, 'Elektro-Spule', 'Eine hochwertige Induktionsspule.').
-item(battery, 'Hochleistungsbatterie', 'Eine spezielle Batterie für EMP-Geräte.').
-item(capacitor, 'Kondensator', 'Ein Hochspannungskondensator.').
+item(emp_generator, 'EMP-Generator', 'Ein mächtiger EMP-Generator gegen das Sischerheitssytem des Aviary HQs.').
+item(spule, 'Elektro-Spule', 'Eine hochwertige Induktionsspule.').
+item(batterie, 'Hochleistungsbatterie', 'Eine spezielle Batterie für EMP-Geräte.').
+item(kondensator, 'Kondensator', 'Ein Hochspannungskondensator.').
 item(heilspray, 'Heilspray', 'Regeneriert 30 Gesundheitspunkte.').
 item(drohnen_motor, 'Drohnen-Motor', 'Ein kleiner Motor für Drohnen-Antrieb.').
 item(steuerungsmodul, 'Steuerungsmodul', 'Elektronisches Modul zur Drohnen-Steuerung.').
-item(master_key, 'Master-Schlüssel', 'Ein geheimnisvoller Schlüssel mit Aviary-Logo. Gewährt vollständigen Systemzugriff.').
+item(master_schluessel, 'Master-Schlüssel', 'Ein geheimnisvoller Schlüssel mit Aviary-Logo. Gewährt vollständigen Systemzugriff.').
 
 % Initial item locations
 init_items :-
     retractall(item_location(_, _)),
     retractall(player_inventory(_)),
     assertz(player_inventory(laptop)),
+    assertz(item_location(emp_granate, htl_werkstatt)),
+    assertz(item_location(emp_granate, htl_werkstatt)),
     assertz(item_location(parkour_handschuhe, altstadt)),
     assertz(item_location(heilspray, htl_labor)).
 
@@ -144,7 +148,7 @@ start_game :-
     init_items,
     init_npcs,
     init_enemies,
-    clear_screen,
+    %clear_screen,
     write('=== SKYNET: WINGS OF DECEPTION ==='), nl,
     write('Ein Text-Adventure von Jonas Hinterdorfer und Zsombor Matyas'), nl, nl,
     intro_story,
@@ -156,7 +160,7 @@ intro_story :-
     write('Ihre Augen glühten rot und ihre Bewegungen waren unnatürlich präzise...'), nl,
     write('Jetzt sitzt du im Cybersicherheitslabor und analysierst die Aufnahmen.'), nl, nl,
     write('Für alle verfügbare Befehle schreibe \'hilfe.\''), nl,
-    write('Bsp: \'verwende(laptop).\''), nl.
+    write('Bsp: \'verwende(laptop).\''), nl, nl.
 
 game_loop :-
     (in_combat(Enemy) -> combat_loop(Enemy) ; normal_loop).
@@ -164,26 +168,27 @@ game_loop :-
 normal_loop :-
     player_location(Loc),
     location(Loc, Name, _),
-    nl,
     write('Du befindest dich in: '), write(Name), nl,
     write('> '),
     read_line(Command),
     process_command(Command),
+    nl,
     check_game_state,
     !,
     game_loop.
 
 combat_loop(Enemy) :-
     enemy(Enemy, DisplayName, Health, _),
+    nl,
     write('=== KAMPF GEGEN '), write(DisplayName), write(' ==='), nl,
     write('Feind Gesundheit: '), write(Health), nl,
     player_health(PlayerHealth),
     write('Deine Gesundheit: '), write(PlayerHealth), nl,
-    write('Verfügbare Aktionen: angriff, verwende(item)'), nl,
+    write('Verfügbare Aktionen: angriff, verwende(item)'), nl, nl,
     write('> '),
     read_line(Command),
     process_combat_command(Command, Enemy),
-    check_combat_state,
+    check_game_state,
     !,
     game_loop.
 
@@ -223,14 +228,14 @@ check_konami_input(Input) :-
             true)) ;
         (retract(konami_position(_)),
          assertz(konami_position(0)),
-         write('Ungültige Richtung.'), nl)).
+         write('Invalide Code, Hinweis: Contra.'), nl)).
 
 unlock_konami_code :-
     game_state(konami_unlocked, false),
     write('*** KONAMI CODE AKTIVIERT! ***'), nl,
     write('Ein geheimnisvoller Master-Schlüssel materialisiert sich in deinem Inventar!'), nl,
     write('Dieses Artefakt gewährt dir vollständigen Zugriff auf alle Systeme...'), nl,
-    assertz(player_inventory(master_key)),
+    assertz(player_inventory(master_schluessel)),
     retract(game_state(konami_unlocked, false)),
     assertz(game_state(konami_unlocked, true)),
     retract(konami_position(_)),
@@ -312,9 +317,9 @@ process_command([cheat, heal]) :-
     write('Gesundheit wiederhergestellt!'), nl.
 
 process_command([cheat, items]) :-
-    assertz(player_inventory(coil)),
-    assertz(player_inventory(battery)),
-    assertz(player_inventory(capacitor)),
+    assertz(player_inventory(spule)),
+    assertz(player_inventory(batterie)),
+    assertz(player_inventory(kondensator)),
     assertz(player_inventory(emp_granate)),
     assertz(player_inventory(emp_granate)),
     assertz(player_inventory(parkour_handschuhe)),
@@ -328,15 +333,15 @@ process_command([cheat, teleport, LOC]) :-
     assertz(player_location(LOC)).
 
 process_command([cheat, generator_components]) :-
-    assertz(player_inventory(coil)),
-    assertz(player_inventory(battery)),
-    assertz(player_inventory(capacitor)),
+    assertz(player_inventory(spule)),
+    assertz(player_inventory(batterie)),
+    assertz(player_inventory(kondensator)),
     write('EMP-Generator Komponenten erhalten!'), nl.
   
 process_command([cheat, generator_components]) :-
-    assertz(player_inventory(coil)),
-    assertz(player_inventory(battery)),
-    assertz(player_inventory(capacitor)),
+    assertz(player_inventory(spule)),
+    assertz(player_inventory(batterie)),
+    assertz(player_inventory(kondensator)),
     write('EMP-Generator Komponenten erhalten!'), nl.
 
 process_command(_) :-
@@ -541,7 +546,13 @@ combat_use_item(_, _) :-
     write('Du hast diesen Gegenstand nicht!'), nl.
 
 execute_combat_item_use(emp_granate, Enemy) :-
+    emp_used_in_combat(Enemy),
+    write('Du hast bereits eine EMP-Granate in diesem Kampf verwendet!'), nl,
+    !.
+
+execute_combat_item_use(emp_granate, Enemy) :-
     enemy(Enemy, DisplayName, Health, Desc),
+    assertz(emp_used_in_combat(Enemy)),
     (Enemy = die_kraehe ->
         (write('Du schwächst die Krähe mit der EMP-Granate!'), nl,
          retract(game_state(crow_weakened, false)),
@@ -555,8 +566,8 @@ execute_combat_item_use(emp_granate, Enemy) :-
          (NewHealth =< 0 ->
             (write(DisplayName), write(' wurde besiegt!'), nl,
              defeat_enemy(Enemy)) ;
-            assertz(enemy(Enemy, DisplayName, NewHealth, Desc)),
-            enemy_turn(Enemy)))).
+            (assertz(enemy(Enemy, DisplayName, NewHealth, Desc)),
+             enemy_turn(Enemy))))).
 
 execute_combat_item_use(kampfdrohne, Enemy) :-
     enemy(Enemy, DisplayName, Health, Desc),
@@ -574,7 +585,12 @@ execute_combat_item_use(heilspray, _) :-
     execute_item_use(heilspray).
 
 execute_combat_item_use(Item, _) :-
-    write(Item), write('kannst nicht in Kampf verwenden.'), nl.
+    \+ member(Item, [emp_granate, kampfdrohne, heilspray]),
+    item(Item, DisplayName, _),
+    write(DisplayName), write(' kann nicht im Kampf verwendet werden!'), nl.
+
+execute_combat_item_use(Item, _) :-
+    write(Item), write(' kann nicht im Kampf verwendet werden!'), nl.
 
 enemy_turn(Enemy) :-
     enemy(Enemy, DisplayName, _, _),
@@ -584,36 +600,22 @@ enemy_turn(Enemy) :-
 
 normal_enemy_attack(_, DisplayName) :-
     get_random_enemy_damage(Damage),
-    player_health(Health),
-    NewHealth is Health - Damage,
+    damage_player(Damage),
     write(DisplayName), write(' greift an und verursacht '), 
-    write(Damage), write(' Schaden!'), nl,
-    retract(player_health(Health)),
-    assertz(player_health(NewHealth)).
+    write(Damage), write(' Schaden!'), nl.
 
 crow_mind_control :-
     write('Die Krähe übernimmt die Kontrolle über deinen Verstand!'), nl,
     write('Du schlägst dich selbst!'), nl,
-    player_health(Health),
-    Damage = 20,
-    NewHealth is Health - Damage,
-    write('Du verursachst dir '), write(Damage), write(' Schaden!'), nl,
-    retract(player_health(Health)),
-    assertz(player_health(NewHealth)).
-
-check_combat_state :-
-    player_health(Health),
-    Health =< 0,
-    end_game(defeat).
-
-check_combat_state :-
-    player_health(Health),
-    Health > 0.
+    damage_player(20),
+    write('Du verursachst dir '), write(20), write(' Schaden!'), nl.
 
 defeat_enemy(EnemyName) :-
     retract(enemy_location(EnemyName, _)),
     retract(in_combat(EnemyName)),
-    handle_enemy_defeat(EnemyName).
+    handle_enemy_defeat(EnemyName),
+    retractall(emp_used_in_combat(EnemyName)),
+    nl.
 
 handle_enemy_defeat(tauben_schwarm) :-
     write('Die Tauben explodieren! Du findest ein Heilspray und einen Drohnen-Motor in den Trümmern.'), nl,
@@ -639,13 +641,13 @@ handle_enemy_defeat(die_kraehe) :-
 % ========== CRAFTING SYSTEM ==========
 craft_item(emp_generator) :-
     player_location(htl_werkstatt),
-    player_inventory(coil),
-    player_inventory(battery),
-    player_inventory(capacitor),
+    player_inventory(spule),
+    player_inventory(batterie),
+    player_inventory(kondensator),
     write('Du baust aus Spule, Batterie und Kondensator einen EMP-Generator!'), nl,
-    retract(player_inventory(coil)),
-    retract(player_inventory(battery)),
-    retract(player_inventory(capacitor)),
+    retract(player_inventory(spule)),
+    retract(player_inventory(batterie)),
+    retract(player_inventory(kondensator)),
     assertz(player_inventory(emp_generator)),
     retract(game_state(emp_built, false)),
     assertz(game_state(emp_built, true)),
@@ -704,7 +706,7 @@ hacking_minigame(altstadt) :-
     read(Answer),
     (Answer = 1111 ->
         (write('Korrekt! Du findest eine Elektro-Spule in der Box!'), nl,
-         assertz(player_inventory(coil)),
+         assertz(player_inventory(spule)),
          assertz(box_unlocked(altstadt_box))) ;
         (write('Falsch! Versuch es nochmal.'), nl,
          fail)).
@@ -724,7 +726,7 @@ hacking_minigame(donauufer) :-
     read(Answer),
     (Answer = 2 ->
         (write('Korrekt! Du findest eine Hochleistungsbatterie in der Box!'), nl,
-         assertz(player_inventory(battery)),
+         assertz(player_inventory(batterie)),
          assertz(box_unlocked(donauufer_box))) ;
         (write('Falsch! Versuch es nochmal.'), nl,
          fail)).
@@ -746,7 +748,7 @@ hacking_minigame(poestlingberg) :-
     read(Answer),
     (Answer = 2 ->
         (write('Korrekt! Du findest einen Kondensator in der Box!'), nl,
-         assertz(player_inventory(capacitor)),
+         assertz(player_inventory(kondensator)),
          assertz(box_unlocked(poestlingberg_box))) ;
         (write('Falsch! Versuch es nochmal.'), nl,
          fail)).
@@ -817,10 +819,7 @@ parkour_minigame_altstadt :-
          write('Du findest eine verschlossene Box auf dem Dach.'), nl,
          write('Verwende "hack(box)" um sie zu öffnen.'), nl) ;
         (write('Falsche Sequenz! Du rutschst ab und verlierst 10 Gesundheit.'), nl,
-         player_health(Health),
-         NewHealth is Health - 10,
-         retract(player_health(Health)),
-         assertz(player_health(NewHealth)))).
+         damage_player(10))).
 
 climbing_minigame_donauufer :-
     write('Balance-Challenge: Halte das Gleichgewicht!'), nl,
@@ -843,10 +842,7 @@ balance_challenge(0, Success) :-
 balance_challenge(0, Success) :-
     Success < 4,
     write('Du verlierst das Gleichgewicht und fällst! 15 Schaden!'), nl,
-    player_health(Health),
-    NewHealth is Health - 15,
-    retract(player_health(Health)),
-    assertz(player_health(NewHealth)),
+    damage_player(15),
     !.
 
 balance_challenge(Remaining, Success) :-
@@ -972,9 +968,9 @@ show_status :-
     (game_state(emp_built, true) ->
         write('EMP-Generator: ✓ Gebaut'), nl ;
         (write('EMP-Generator Komponenten:'), nl,
-         (player_inventory(coil) -> write('  Elektro-Spule: ✓') ; write('  Elektro-Spule: ✗')), nl,
-         (player_inventory(battery) -> write('  Batterie: ✓') ; write('  Batterie: ✗')), nl,
-         (player_inventory(capacitor) -> write('  Kondensator: ✓') ; write('  Kondensator: ✗')), nl)),
+         (player_inventory(spule) -> write('  Elektro-Spule: ✓') ; write('  Elektro-Spule: ✗')), nl,
+         (player_inventory(batterie) -> write('  Batterie: ✓') ; write('  Batterie: ✗')), nl,
+         (player_inventory(kondensator) -> write('  Kondensator: ✓') ; write('  Kondensator: ✗')), nl)),
     write('=============='), nl.
 
 % ========== GAME ENDINGS ==========
@@ -1005,7 +1001,7 @@ handle_final_choice(2) :-
     end_game(dark_ruler).
 
 handle_final_choice(3) :-
-    player_inventory(master_key),
+    player_inventory(master_schluessel),
     write('Du verwendest den Master-Schlüssel für vollständigen Systemzugriff...'), nl,
     write('Mit diesem legendären Artefakt hackst du dich mühelos durch alle Sicherheitsebenen!'), nl,
     write('Du übernimmst nicht nur die Kontrolle - du wirst zum Meister des Systems!'), nl,
@@ -1084,6 +1080,12 @@ get_random_damage(Damage) :-
 
 get_random_enemy_damage(Damage) :-
     random(8, 16, Damage).  % Random enemy damage between 8-15
+
+damage_player(Damage) :-
+    player_health(Health),
+    NewHealth is Health - Damage,
+    retract(player_health(Health)),
+    assertz(player_health(NewHealth)).
 
 random_member(Element, List) :-
     length(List, Length),
