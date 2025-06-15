@@ -823,7 +823,7 @@ climb_action :-
 climb_action :-
     write('Hier gibt es nichts zum Klettern.'), nl.
 
-%Parkour-Migigames
+% ========== PARKOUR-MINIGAMES ==========
 parkour_minigame_altstadt :-
     write('Sequenz-Challenge: Wiederhole die Bewegungsfolge!'), nl,
     random_member(Sequence, [[sprung, rolle, kletter], [rolle, sprung, balance], [kletter, sprung, rolle]]),
@@ -975,7 +975,11 @@ trigger_location_event(_).
 % ========== GAME STATE MANAGEMENT ==========
 check_game_state :-
     player_health(Health),
-    (Health =< 0 -> end_game(defeat) ; true).
+    (Health =< 0 -> 
+        (retractall(in_combat(_)), 
+         end_game(defeat),
+         !, fail) ; 
+        true).
 
 show_status :-
     player_health(Health),
@@ -1003,7 +1007,8 @@ final_choice :-
     write('3) Das System hacken und die Kontrolle übernehmen'), nl,
     write('Deine Wahl (1-3): '),
     read(Choice),
-    handle_final_choice(Choice).
+    handle_final_choice(Choice),
+    game_over_menu.
 
 handle_final_choice(1) :-
     write('Du entscheidest dich für das ultimative Opfer...'), nl,
@@ -1051,8 +1056,7 @@ end_game(heroic_sacrifice) :-
     write('Die Menschen von Linz und der ganzen Welt sind frei!'), nl,
     write('Du hast dein Leben für die Freiheit der Menschheit geopfert.'), nl,
     write('Du wirst als Held in Erinnerung bleiben!'), nl,
-    write('ENDE: Der ultimative Held'), nl,
-    halt.
+    write('ENDE: Der ultimative Held'), nl.
 
 end_game(dark_ruler) :-
     clear_screen,
@@ -1062,8 +1066,7 @@ end_game(dark_ruler) :-
     write('Aber auch keine Freiheit, keine Privatsphäre, keine Menschlichkeit.'), nl,
     write('Du sitzt auf einem Thron aus Überwachung und Kontrolle.'), nl,
     write('Die Welt ist "sicher" - aber zu welchem Preis?'), nl,
-    write('ENDE: Der neue Überwacher'), nl,
-    halt.
+    write('ENDE: Der neue Überwacher'), nl.
 
 end_game(master_hacker_victory) :-
     clear_screen,
@@ -1074,8 +1077,7 @@ end_game(master_hacker_victory) :-
     write('und überwachen nur noch wirkliche Bedrohungen.'), nl,
     write('Du hast die perfekte Balance zwischen Sicherheit und Freiheit geschaffen!'), nl,
     write('Die Welt ist in eine neue Ära des technologischen Friedens eingetreten.'), nl,
-    write('ENDE: Der Meister-Hacker (Geheimes Ende)'), nl,
-    halt.
+    write('ENDE: Der Meister-Hacker (Geheimes Ende)'), nl.
 
 end_game(hack_failure) :-
     clear_screen,
@@ -1084,8 +1086,7 @@ end_game(hack_failure) :-
     write('Sicherheitsdrohnen umzingeln dich!'), nl,
     write('Du wurdest gefangen genommen und das System läuft weiter...'), nl,
     write('GAME OVER'), nl,
-    write('Vielleicht gibt es einen anderen Weg... einen geheimen Code?'), nl,
-    write('Möchtest du es nochmal versuchen? Tippe "start_game." um neu zu beginnen.'), nl.
+    write('Vielleicht gibt es einen anderen Weg... einen geheimen Code?'), nl.
 
 end_game(defeat) :-
     clear_screen,
@@ -1093,7 +1094,32 @@ end_game(defeat) :-
     write('Du wurdest von den Drohnen überwältigt.'), nl,
     write('Die Wahrheit bleibt für immer begraben...'), nl,
     write('GAME OVER'), nl,
-    write('Möchtest du es nochmal versuchen? Tippe "start_game." um neu zu beginnen.'), nl.
+    game_over_menu.
+
+game_over_menu :-
+    nl,
+    write('=== SPIEL BEENDET ==='), nl,
+    write('Möchtest du nochmal spielen?'), nl,
+    write('1) Ja - Neues Spiel starten'), nl,
+    write('2) Nein - Program beenden'), nl,
+    write('Deine Wahl (1 oder 2): '),
+    read(Choice),
+    handle_game_over_choice(Choice).
+
+handle_game_over_choice(1) :-
+    nl,
+    write('Startet neues Spiel...'), nl,
+    nl,
+    start_game.
+
+handle_game_over_choice(2) :-
+    write('Auf Wiedersehen! Die Wahrheit muss ans Licht...'), nl,
+    halt.
+
+handle_game_over_choice(_) :-
+    write('Ungültige Wahl! Bitte wähle 1, 2 oder 3.'), nl,
+    game_over_menu.
+
 
 % ========== UTILITY PREDICATES ==========
 get_random_damage(Damage) :-
