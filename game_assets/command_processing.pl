@@ -90,7 +90,7 @@ process_command([cheat, generator_components]) :-
     assertz(player_inventory(kondensator)),
     write('EMP-Generator Komponenten erhalten!'), nl.
   
-process_command([cheat, generator_components]) :-
+process_command([cheat, drone_components]) :-
     assertz(player_inventory(drohnen_motor)),
     assertz(player_inventory(steuerungsmodul)),
     write('Kampfdrone Komponenten erhalten!'), nl.
