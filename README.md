@@ -1,2 +1,2 @@
 # SkyNet: The Wings of Deception
-Kann im Internet unter https://textadventure.git.ionas999.at/ erreicht werden
+Wenn es nicht automatisch starten `start_game` ausführen.
