@@ -72,7 +72,7 @@ intro_story :-
     write('Ihre Augen glühten rot und ihre Bewegungen waren unnatürlich präzise...'), nl,
     write('Jetzt sitzt du im Cybersicherheitslabor und analysierst die Aufnahmen.'), nl, nl,
     write('Für alle verfügbare Befehle schreibe \'hilfe.\''), nl,
-    write('Bsp: \'status.\''), nl, nl.
+    write('Für deine nächsten Ziele schreibe \'status.\''), nl, nl.
 
 game_loop :-
     (in_combat(Enemy) -> combat_loop(Enemy) ; normal_loop).
