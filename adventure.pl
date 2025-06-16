@@ -60,7 +60,7 @@ start_game :-
     init_items,
     init_npcs,
     init_enemies,
-    %clear_screen,
+    clear_screen,
     write('=== SKYNET: WINGS OF DECEPTION ==='), nl,
     write('Ein Text-Adventure von Jonas Hinterdorfer und Zsombor Matyas'), nl, nl,
     intro_story,

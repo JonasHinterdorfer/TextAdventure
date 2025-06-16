@@ -23,9 +23,6 @@ craft_item(emp_generator) :-
     write('Du kannst nur in der HTL Leonding Werkstatt bauen.'), nl,
     !.
 
-craft_item(_) :-
-    write('Du kannst diesen Gegenstand nicht bauen.'), nl.
-
 craft_item(kampfdrohne) :-
     player_location(htl_werkstatt),
     player_inventory(drohnen_motor),
