@@ -163,7 +163,12 @@ jobs:
                       port:
                         number: 80
           EOF
+
           
+          kubectl delete deployment "${Reponame}" -n gitea-deployment --ignore-not-found
+          kubectl delete service "${Reponame}" -n gitea-deployment --ignore-not-found
+          kubectl delete ingress "${Reponame}-ingress" -n gitea-deployment --ignore-not-found
+
           # Display the manifest for debugging
           echo "--- Generated manifest: ---"
           cat k8s-manifests.yaml
