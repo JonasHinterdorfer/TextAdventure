@@ -165,9 +165,9 @@ jobs:
           EOF
 
           
-          kubectl delete deployment "${Reponame}" -n gitea-deployment --ignore-not-found
-          kubectl delete service "${Reponame}" -n gitea-deployment --ignore-not-found
-          kubectl delete ingress "${Reponame}-ingress" -n gitea-deployment --ignore-not-found
+          kubectl delete deployment "${REPO_NAME}" -n gitea-deployment --ignore-not-found
+          kubectl delete service "${REPO_NAME}" -n gitea-deployment --ignore-not-found
+          kubectl delete ingress "${REPO_NAME}-ingress" -n gitea-deployment --ignore-not-found
 
           # Display the manifest for debugging
           echo "--- Generated manifest: ---"
